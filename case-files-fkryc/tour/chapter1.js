@@ -1,0 +1,1 @@
+window.MAPS = window.MAPS || {}; window.MAPS["chapter1"] = {"img": "tour/img/chapter1.jpg", "pins": {"paris": [25.49, 22.52], "alps": [35.89, 30.1], "venice": [39.35, 34.95], "vienna": [44.96, 24.95], "istanbul": [62.47, 49.97], "cairo": [65.61, 83.35], "london": [22.04, 12.3]}};

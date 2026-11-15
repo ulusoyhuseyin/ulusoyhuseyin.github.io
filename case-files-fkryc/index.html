@@ -1,0 +1,391 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="robots" content="noindex, nofollow">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>The Detective's Grand Tour</title>
+<meta name="description" content="A motion-comic detective game. Travel the world of 1926, question suspects, catch the liar.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Special+Elite&family=Bangers&family=Playfair+Display:ital,wght@0,600;0,800;1,600&display=swap" rel="stylesheet">
+<style>
+:root { color-scheme: dark; --bg: #0b0a0d; --panel: #16141a; --panel2: #201d25; --line: #34303c; --text: #f2eadb; --muted: #b3a891; --amber: #f0b45a; --teal: #7fb7b0; --red: #e0574a; --good: #6fd29b; --ink: #2b1d10; --moth: #b9a6ff; }
+* { box-sizing: border-box; }
+html, body { margin: 0; background: var(--bg); color: var(--text); font: 16px/1.5 Georgia, serif; }
+body { min-height: 100vh; background: radial-gradient(ellipse at top, #1c2426 0%, var(--bg) 65%) fixed; overflow-x: hidden; }
+button { font: inherit; color: inherit; cursor: pointer; }
+.wrap { max-width: 1400px; margin: 0 auto; padding: 0 16px; }
+
+/* header */
+header { display: flex; align-items: flex-end; justify-content: space-between; gap: 12px; flex-wrap: wrap; padding-top: 16px; }
+.brand .kicker { margin: 0; font: 12px "Special Elite", monospace; letter-spacing: 4px; text-transform: uppercase; color: var(--teal); }
+.brand h1 { margin: 2px 0 0; font: 800 clamp(26px, 5vw, 42px)/1.05 "Playfair Display", Georgia, serif; color: var(--amber); text-shadow: 0 0 28px rgba(240,180,90,.3); }
+.brand h1 i { font-weight: 600; color: var(--text); }
+.hud { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.pill { display: flex; gap: 8px; align-items: center; background: var(--panel); border: 1px solid var(--line); border-radius: 99px; padding: 6px 12px; font-size: 14px; white-space: nowrap; }
+.pill b { color: var(--amber); }
+.rank { flex-direction: column; align-items: flex-start; gap: 3px; border-radius: 12px; padding: 5px 12px 7px; }
+.rank .bar { width: 120px; height: 4px; background: var(--line); border-radius: 4px; overflow: hidden; } .rank .bar i { display: block; height: 100%; background: var(--amber); transition: width .8s; }
+.rank small { color: var(--muted); font-size: 11px; }
+.iconbtn { background: var(--panel); border: 1px solid var(--line); border-radius: 99px; padding: 6px 12px; font-size: 14px; transition: border-color .2s; }
+.iconbtn:hover { border-color: var(--amber); }
+
+/* chapters */
+.chapters { display: flex; gap: 6px; margin: 14px 0 10px; overflow-x: auto; scrollbar-width: none; }
+.chapters button { flex: 0 0 auto; background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 7px 14px; font-size: 14px; color: var(--muted); text-align: left; }
+.chapters button.on { color: var(--text); border-color: var(--amber); background: var(--panel2); }
+.chapters button small { display: block; font: 11px "Special Elite", monospace; letter-spacing: 1px; color: var(--muted); }
+
+/* map */
+.mapwrap { overflow-x: auto; overflow-y: hidden; scrollbar-width: thin; -webkit-overflow-scrolling: touch; border-radius: 16px; }
+.map { position: relative; width: max(100%, 980px); aspect-ratio: 16 / 9; border-radius: 16px; overflow: hidden; box-shadow: 0 20px 60px rgba(0,0,0,.6), 0 0 0 1px #4a3a22; }
+.map > img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; display: block; }
+.route { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; z-index: 1; }
+.route .all { fill: none; stroke: rgba(43,29,16,.5); stroke-width: 4; stroke-dasharray: 2 12; stroke-linecap: round; }
+.route .done { fill: none; stroke: #b4321f; stroke-width: 5; stroke-dasharray: 2 12; stroke-linecap: round; animation: march 1.6s linear infinite; }
+.route .draw { fill: none; stroke: #b4321f; stroke-width: 5; stroke-linecap: round; }
+@keyframes march { to { stroke-dashoffset: -28; } }
+.train { position: absolute; z-index: 3; width: 44px; height: 44px; margin: -22px 0 0 -22px; font-size: 30px; line-height: 44px; text-align: center; filter: drop-shadow(0 3px 3px rgba(0,0,0,.5)); pointer-events: none; }
+.puff { position: absolute; z-index: 2; width: 16px; height: 16px; margin: -8px; border-radius: 50%; background: rgba(250,245,235,.85); pointer-events: none; animation: puff 1.4s ease-out forwards; }
+@keyframes puff { to { transform: translate(-10px, -30px) scale(2.6); opacity: 0; } }
+
+.stop { position: absolute; z-index: 2; transform: translate(-50%, -50%); background: none; border: 0; padding: 0; display: flex; flex-direction: column; align-items: center; gap: 4px; }
+.medal { position: relative; width: 62px; height: 62px; border-radius: 50%; border: 3px solid #e9c27a; box-shadow: 0 0 0 3px var(--ink), 0 8px 18px rgba(0,0,0,.55); transition: transform .2s; background: var(--ink); }
+.medal img { width: 100%; height: 100%; border-radius: 50%; object-fit: cover; display: block; }
+.num { position: absolute; left: -6px; top: -6px; width: 24px; height: 24px; border-radius: 50%; background: var(--ink); color: #e9c27a; border: 2px solid #e9c27a; font: 600 12px/20px "Playfair Display", serif; text-align: center; }
+.tag { font: 600 13px "Playfair Display", serif; color: #fff7e6; background: rgba(43,29,16,.9); border: 1px solid rgba(233,194,122,.6); border-radius: 6px; padding: 1px 8px; white-space: nowrap; }
+.stars { font-size: 13px; letter-spacing: 1px; color: #f4c35c; text-shadow: 0 1px 2px #000; line-height: 1; }
+.stars .dim { opacity: .3; }
+.stop:hover .medal, .stop.sel .medal { transform: scale(1.12); }
+.stop.sel .medal { border-color: #fff; }
+.stop.soon .medal img, .stop.locked .medal img { filter: grayscale(1) brightness(.55) sepia(.3); }
+.stop.soon .medal { width: 48px; height: 48px; border-color: #8b7a5a; }
+.stop.soon .tag { font-size: 12px; opacity: .9; }
+.badge { position: absolute; right: -8px; bottom: -6px; font-size: 14px; background: var(--ink); border-radius: 50%; width: 24px; height: 24px; display: grid; place-items: center; border: 2px solid #8b7a5a; }
+.mothb { position: absolute; right: -9px; top: -7px; font-size: 13px; background: #15121c; border: 1.5px solid var(--moth); border-radius: 50%; width: 22px; height: 22px; display: grid; place-items: center; }
+.stop.open .medal { animation: beacon 1.8s ease-out infinite; }
+@keyframes beacon { 0% { box-shadow: 0 0 0 3px var(--ink), 0 0 0 3px rgba(240,180,90,.9); } 100% { box-shadow: 0 0 0 3px var(--ink), 0 0 0 26px rgba(240,180,90,0); } }
+.here { position: absolute; top: -34px; left: 50%; transform: translateX(-50%); font: 22px/1 Georgia; color: var(--red); text-shadow: 0 2px 4px rgba(0,0,0,.6); animation: bob 1.2s ease-in-out infinite; }
+@keyframes bob { 50% { transform: translate(-50%, -6px); } }
+.stop.finale .medal { width: 70px; height: 70px; border-color: var(--red); }
+.stop.pop .medal { animation: popin .7s cubic-bezier(.3,1.7,.5,1) both; }
+@keyframes popin { from { transform: scale(.2); } }
+.inkstamp { position: absolute; left: 50%; top: 50%; z-index: 4; transform: translate(-50%, -50%) rotate(-14deg); font: 20px "Bangers", Impact, sans-serif; letter-spacing: 2px; color: #c0291c; border: 3px solid #c0291c; border-radius: 6px; padding: 0 8px; background: rgba(250,240,220,.75); animation: stampin .45s cubic-bezier(.3,1.6,.5,1) both; pointer-events: none; }
+@keyframes stampin { from { opacity: 0; transform: translate(-50%, -50%) rotate(-14deg) scale(3.2); } }
+
+/* locked chapter */
+.chapterlock { aspect-ratio: 16 / 9; min-height: 320px; border-radius: 16px; display: grid; place-items: center; text-align: center; padding: 24px; background: radial-gradient(ellipse, #2a2116, #120e0a); border: 1px solid #4a3a22; }
+.chapterlock .big { font-size: 54px; } .chapterlock h2 { font: 800 28px "Playfair Display", serif; margin: 6px 0; color: var(--amber); }
+.chapterlock p { color: var(--muted); max-width: 460px; margin: 0 auto 14px; }
+
+/* case card */
+.case { display: grid; grid-template-columns: 180px 1fr; gap: 18px; background: var(--panel); border: 1px solid var(--line); border-radius: 16px; overflow: hidden; margin-top: 14px; animation: up .35s cubic-bezier(.2,.8,.2,1) both; }
+@keyframes up { from { opacity: 0; transform: translateY(10px); } }
+.case > img { width: 100%; height: 100%; min-height: 160px; object-fit: cover; display: block; }
+.case .body { padding: 16px 16px 16px 0; display: flex; flex-direction: column; gap: 6px; }
+.meta { font: 12px "Special Elite", monospace; letter-spacing: 2px; text-transform: uppercase; color: var(--muted); display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
+.case h2 { margin: 0; font: 800 26px/1.15 "Playfair Display", Georgia, serif; }
+.case p { margin: 0; color: var(--muted); }
+.diff { font: 600 11px "Special Elite", monospace; letter-spacing: 1px; text-transform: uppercase; padding: 2px 8px; border-radius: 99px; border: 1px solid; }
+.diff.easy { color: var(--good); } .diff.medium { color: var(--amber); } .diff.hard { color: var(--red); }
+.cta { margin-top: 8px; display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
+.btn { display: inline-block; background: var(--amber); color: #1d1206; border: 0; border-radius: 10px; padding: 11px 22px; font: 600 17px "Playfair Display", Georgia, serif; text-decoration: none; transition: transform .15s, box-shadow .2s; }
+.btn:hover { transform: translateY(-2px); box-shadow: 0 6px 20px rgba(240,180,90,.3); }
+.btn.off { background: var(--panel2); color: var(--muted); border: 1px solid var(--line); pointer-events: none; }
+.note { color: var(--muted); font-size: 14px; }
+.mothnote { color: var(--moth); font-size: 13px; }
+.foot { text-align: center; color: var(--muted); font-size: 13px; margin: 18px 0 40px; }
+.foot button { background: none; border: 0; color: var(--muted); text-decoration: underline; font-size: 13px; }
+
+/* overlays: passport, celebration */
+.overlay { position: fixed; inset: 0; z-index: 30; background: rgba(5,4,3,.78); display: flex; align-items: center; justify-content: center; padding: 16px; animation: fade .25s both; }
+@keyframes fade { from { opacity: 0; } }
+.sheet { width: min(760px, 100%); max-height: 92vh; overflow: auto; border-radius: 16px; animation: pop .4s cubic-bezier(.2,1.3,.4,1) both; }
+@keyframes pop { from { opacity: 0; transform: scale(.9) rotate(-1deg); } }
+.passport { background: #efe2c4; color: var(--ink); padding: 22px; box-shadow: inset 0 0 60px rgba(120,80,30,.35); }
+.passport h2 { font: 800 26px "Playfair Display", serif; margin: 0; text-align: center; letter-spacing: 3px; }
+.passport .who { text-align: center; font: 13px "Special Elite", monospace; letter-spacing: 2px; margin: 4px 0 16px; }
+.pages { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 12px; }
+.page { position: relative; min-height: 140px; border: 1px dashed rgba(43,29,16,.35); border-radius: 8px; display: grid; place-items: center; padding: 22px 10px 10px; text-align: center; }
+.page .city { position: absolute; left: 8px; top: 6px; font: 11px "Special Elite", monospace; letter-spacing: 1px; opacity: .55; text-transform: uppercase; }
+.pstamp { border: 3px double currentColor; border-radius: 50%; width: 100px; height: 100px; margin: 0 auto; display: grid; place-content: center; transform: rotate(var(--r)); font: 700 13px "Playfair Display", serif; text-transform: uppercase; letter-spacing: 1px; line-height: 1.25; mix-blend-mode: multiply; opacity: .88; }
+.pstamp small { font: 10px "Special Elite", monospace; letter-spacing: 1px; }
+.page.empty .pstamp { border-style: dashed; opacity: .22; }
+.souv { font-size: 12px; font-style: italic; margin-top: 6px; opacity: .8; }
+.cfile { margin-top: 18px; background: #16121c; color: #e8e0f8; border-radius: 12px; padding: 14px; }
+.cfile h3 { margin: 0 0 4px; font: 800 18px "Playfair Display", serif; color: var(--moth); }
+.cards { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 10px; }
+.ccard { width: 58px; height: 36px; border-radius: 4px; display: grid; place-items: center; font-size: 15px; background: #050407; border: 1px solid #3a3346; box-shadow: 0 3px 8px rgba(0,0,0,.5); }
+.ccard.got { border-color: var(--moth); box-shadow: 0 0 12px rgba(185,166,255,.35); } .ccard.no { opacity: .35; font: 13px Georgia; color: #888; }
+.close { display: block; margin: 16px auto 0; }
+
+.celebrate { text-align: center; background: var(--panel); border: 1px solid var(--amber); border-radius: 16px; padding: 26px 22px; width: min(440px, 100%); animation: pop .45s cubic-bezier(.2,1.3,.4,1) both; }
+.celebrate .k { font: 12px "Special Elite", monospace; letter-spacing: 3px; color: var(--teal); text-transform: uppercase; }
+.celebrate h2 { font: 800 30px "Playfair Display", serif; margin: 6px 0; color: var(--amber); }
+.celebrate .stars { font-size: 34px; }
+.banner { position: fixed; left: 50%; top: 18px; transform: translateX(-50%); z-index: 40; background: #1f1a12; border: 2px solid var(--amber); border-radius: 12px; padding: 10px 18px; font: 600 16px "Playfair Display", serif; box-shadow: 0 10px 30px rgba(0,0,0,.6); animation: drop .5s cubic-bezier(.2,1.4,.4,1) both; max-width: calc(100vw - 32px); text-align: center; }
+@keyframes drop { from { opacity: 0; transform: translate(-50%, -30px); } }
+
+.badges { display: inline-flex; gap: 4px; vertical-align: middle; } .badges i { font-style: normal; filter: grayscale(1); opacity: .3; } .badges i.on { filter: none; opacity: 1; } .badges.big { font-size: 20px; }
+.passport .badges { display: flex; justify-content: center; margin-top: 4px; }
+.consent { position: fixed; left: 50%; bottom: 14px; transform: translateX(-50%); z-index: 25; width: min(560px, calc(100vw - 32px)); background: #1f1a12; border: 1px solid var(--amber); border-radius: 14px; padding: 12px 14px; box-shadow: 0 10px 40px rgba(0,0,0,.6); font-size: 14px; animation: drop .5s both; }
+.consent p { margin: 0 0 8px; } .consent .btn { padding: 7px 14px; font-size: 14px; } .consent .btn.ghost { background: transparent; color: var(--text); border: 1px solid var(--line); }
+@media (max-width: 620px) {
+  .case { grid-template-columns: 1fr; gap: 0; } .case > img { display: none; } .case .body { padding: 14px; } .case h2 { font-size: 22px; }
+  .map { width: 980px; } .rank .bar { width: 90px; }
+}
+@media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation: none !important; transition: none !important; } }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div class="brand"><p class="kicker">Season one · 1926</p><h1>The Detective’s <i>Grand Tour</i></h1></div>
+    <div class="hud" id="hud"></div>
+  </header>
+  <nav class="chapters" id="chapters"></nav>
+  <div id="stage"></div>
+  <div id="card"></div>
+  <p class="foot">Private preview · © 2026 The Detective’s Grand Tour. All rights reserved.<br>Progress is saved on this device. <button id="reset">Reset progress</button></p>
+</div>
+
+<script src="tour/chapter1.js"></script>
+<script src="shared/track.js"></script>
+<script>
+// ===== Tour data. Release 1: chapter 1, cases 1-3 playable; the rest "Coming soon". =====
+// ready = built and playable. dev = playable only with ?dev in the address (local testing).
+var CHAPTERS = [
+  { id: "chapter1", name: "Europe & the Orient", sub: "Chapter 1", map: "chapter1", stops: [
+    { id: "paris",    city: "Paris",      title: "The Stolen Recipe",           diff: "easy",   mins: 8,  ready: true, href: "paris/index.html", thumb: "paris/img/co_1.jpg", souvenir: "A golden croissant recipe",
+      blurb: "A famous croissant recipe vanishes at dawn. Three suspects, one lie. Your first case comes with a guide." },
+    { id: "alps",     city: "Swiss Alps", title: "Snowbound at the Sanatorium", diff: "easy",   mins: 10, ready: true, href: "alps/index.html", nudge: [-2.6, -2.2], thumb: "alps/img/co_1.jpg", souvenir: "Anton’s winning ski badge",
+      blurb: "Someone drugged the champion’s cocoa the night before the big race. Four guests, one liar." },
+    { id: "venice",   city: "Venice",     title: "Masks at the Regatta",        diff: "easy",   mins: 12, ready: true, href: "venice/index.html", nudge: [1.4, 1.8], thumb: "venice/img/co_1.jpg", souvenir: "A gold-and-crimson mask ribbon",
+      blurb: "The Golden Oar disappears an hour before the race. This time, someone lies about someone else." },
+    { id: "vienna",   city: "Vienna",     title: "The Last Aria",               diff: "medium", mins: 14, thumb: "tour/img/stop_vienna.jpg",
+      blurb: "Opening night. The diva hits her high note, and the lights go out." },
+    { id: "istanbul", city: "Istanbul",   title: "Last Stop, Constantinople",   diff: "medium", mins: 15, thumb: "tour/img/stop_istanbul.jpg",
+      blurb: "The night train arrives with one passenger fewer than it left with." },
+    { id: "cairo",    city: "Cairo",      title: "The Pharaoh’s Gala",          diff: "medium", mins: 16, thumb: "tour/img/stop_cairo.jpg", ship: true,
+      blurb: "A golden scarab vanishes from a sealed case during the museum’s grand gala." },
+    { id: "seance",   city: "London",     title: "The Séance at Hotel Lumière", diff: "hard",   mins: 20, finale: true, ship: true, pin: "london", nudge: [-3.5, -4.5], thumb: "tour/img/stop_london.jpg",
+      blurb: "The chapter finale. Seven hands joined in the dark. One of them let go. And the Collector is in the room." }
+  ] },
+  { id: "chapter2", name: "The Americas", sub: "Chapter 2", icon: "🗽", lockedText: "New York, Chicago, New Orleans, Havana… The Collector crosses the Atlantic." },
+  { id: "chapter3", name: "Asia", sub: "Chapter 3", icon: "🏯", lockedText: "Bombay, Shanghai, Tokyo… The trail leads east." }
+];
+var RANKS = [[0, "Rookie"], [3, "Junior Detective"], [6, "Detective"], [9, "Inspector"], [13, "Chief Inspector"], [18, "Legend of the Yard"]];
+var DEV = /[?&]dev/.test(location.search);
+var CH = CHAPTERS[0], STOPS = CH.stops, PINS = window.MAPS[CH.map].pins;
+
+// ===== storage (reads and writes may fail in private windows) =====
+function getj(k, d) { try { var v = JSON.parse(localStorage.getItem(k)); return v == null ? d : v; } catch (e) { return d; } }
+function setj(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) {} }
+function saved(id) { return getj("episode." + id + ".v1", {}) || {}; }
+var GOALS = [["moth", "🦋", "Sharp eye: found the Collector card"], ["nohint", "🧠", "Own wits: solved without hints"], ["fast", "⏱️", "Quick wit: solved fast"]];
+function badgeRow(id, big) { var b = getj("badges." + id, []); return '<span class="badges' + (big ? " big" : "") + '">' + GOALS.map(function (g) { return '<i class="' + (b.indexOf(g[0]) >= 0 ? "on" : "") + '" title="' + g[2] + '">' + g[1] + "</i>"; }).join("") + "</span>"; }
+function badgeCount() { return STOPS.reduce(function (a, s) { return a + getj("badges." + s.id, []).length; }, 0); }
+function starsOf(id) { var s = saved(id); if (!s.solved) return 0; return s.stars || Math.max(1, 3 - (s.wrong || 0) - (id === "seance" ? (s.hints || 0) : 0)); }
+function playable(s) { return s.ready || (DEV && s.dev); }
+function esc(t) { return String(t).replace(/[&<>"]/g, function (c) { return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]; }); }
+function statuses() {
+  var blocked = false;
+  return STOPS.map(function (s) { if (!playable(s)) return "soon"; if (starsOf(s.id)) return "solved"; if (blocked) return "locked"; blocked = true; return "open"; });
+}
+function totalStars() { return STOPS.reduce(function (a, s) { return a + starsOf(s.id); }, 0); }
+function rankOf(n) { var r = RANKS[0], next = RANKS[1]; RANKS.forEach(function (x, i) { if (n >= x[0]) { r = x; next = RANKS[i + 1] || null; } }); return { name: r[1], from: r[0], next: next }; }
+
+// ===== sound: synthesised with WebAudio (no audio files, no licences) =====
+var SND = (function () {
+  var ctx = null, master = null, amb = null, on = getj("tour.sound", true);
+  function init() { if (ctx) return; try { ctx = new (window.AudioContext || window.webkitAudioContext)(); master = ctx.createGain(); master.gain.value = on ? 1 : 0; master.connect(ctx.destination); } catch (e) { ctx = null; } }
+  function brown(sec) { var b = ctx.createBuffer(1, ctx.sampleRate * sec, ctx.sampleRate), d = b.getChannelData(0), last = 0; for (var i = 0; i < d.length; i++) { last = (last + 0.02 * (Math.random() * 2 - 1)) / 1.02; d[i] = last * 3.5; } return b; }
+  function white(sec) { var b = ctx.createBuffer(1, ctx.sampleRate * sec, ctx.sampleRate), d = b.getChannelData(0); for (var i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1; return b; }
+  function env(g, t, a, peak, dec) { g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(peak, t + a); g.gain.exponentialRampToValueAtTime(0.0001, t + a + dec); }
+  function tone(type, f0, f1, dur, vol, at) { if (!ctx) return; var t = ctx.currentTime + (at || 0), o = ctx.createOscillator(), g = ctx.createGain(); o.type = type; o.frequency.setValueAtTime(f0, t); if (f1) o.frequency.exponentialRampToValueAtTime(f1, t + dur); env(g, t, 0.005, vol, dur); o.connect(g); g.connect(master); o.start(t); o.stop(t + dur + 0.05); }
+  function burst(buf, type, freq, q, dur, vol, at) { if (!ctx) return; var t = ctx.currentTime + (at || 0), s = ctx.createBufferSource(), f = ctx.createBiquadFilter(), g = ctx.createGain(); s.buffer = buf; f.type = type; f.frequency.value = freq; f.Q.value = q; env(g, t, 0.004, vol, dur); s.connect(f); f.connect(g); g.connect(master); s.start(t); s.stop(t + dur + 0.05); }
+  var api = {
+    unlock: function () { init(); if (ctx && ctx.state === "suspended") ctx.resume(); if (on) api.ambience(); },
+    isOn: function () { return on; },
+    toggle: function () { on = !on; setj("tour.sound", on); init(); if (master) master.gain.setTargetAtTime(on ? 1 : 0, ctx.currentTime, 0.05); if (on) api.ambience(); return on; },
+    tick: function () { tone("triangle", 1800, 1200, 0.05, 0.08); },
+    paper: function () { if (ctx) burst(white(0.3), "bandpass", 2400, 0.7, 0.22, 0.25); },
+    stamp: function (at) { if (!ctx) return; tone("sine", 140, 45, 0.25, 0.9, at); burst(white(0.1), "lowpass", 900, 0.8, 0.06, 0.6, at); },
+    chuff: function (at) { if (ctx) burst(white(0.3), "lowpass", 700 + Math.random() * 300, 1.2, 0.16, 0.5, at); },
+    whistle: function (at) { if (!ctx) return; [740, 932, 1108].forEach(function (f) { tone("sine", f, f * 0.99, 1.1, 0.12, at); }); burst(white(1.2), "bandpass", 1000, 4, 1.0, 0.12, at); },
+    horn: function (at) { if (!ctx) return; tone("sawtooth", 98, 96, 1.8, 0.06, at); tone("sawtooth", 147, 145, 1.8, 0.04, at); },
+    ding: function (at) { if (!ctx) return; tone("sine", 1318, 0, 1.4, 0.22, at); tone("sine", 2636, 0, 0.9, 0.08, at); tone("sine", 1975, 0, 1.1, 0.07, (at || 0) + 0.12); },
+    fanfare: function () { if (!ctx) return; [523, 659, 784, 1046].forEach(function (f, i) { tone("triangle", f, 0, 0.5, 0.16, i * 0.11); }); },
+    ambience: function () { // a quiet harbour: slow waves of filtered noise, now and then a far-off ship horn
+      if (!ctx || amb) return;
+      var s = ctx.createBufferSource(); s.buffer = brown(4); s.loop = true;
+      var f = ctx.createBiquadFilter(); f.type = "lowpass"; f.frequency.value = 520;
+      var g = ctx.createGain(); g.gain.value = 0.035;
+      var lfo = ctx.createOscillator(), lg = ctx.createGain(); lfo.frequency.value = 0.09; lg.gain.value = 0.03; lfo.connect(lg); lg.connect(g.gain);
+      s.connect(f); f.connect(g); g.connect(master); s.start(); lfo.start(); amb = s;
+      (function far() { setTimeout(function () { if (on && ctx) { tone("sawtooth", 98, 96, 2.2, 0.02); tone("sawtooth", 147, 145, 2.2, 0.012); } far(); }, 25000 + Math.random() * 30000); })();
+    }
+  };
+  return api;
+})();
+["pointerdown", "keydown"].forEach(function (ev) { window.addEventListener(ev, function () { SND.unlock(); }, { once: true }); });
+
+// ===== drawing =====
+var stage = document.getElementById("stage"), card = document.getElementById("card");
+var ST = statuses(), chapterIdx = 0, TRIP = -1;
+var selected = ST.indexOf("open") >= 0 ? ST.indexOf("open") : Math.max(0, ST.lastIndexOf("solved"));
+
+function pin(s) { var p = PINS[s.pin || s.id], n = s.nudge || [0, 0]; return [p[0] + n[0], p[1] + n[1]]; } // nudge: keep close cities from overlapping
+function xy(i) { var p = pin(STOPS[i]); return [p[0] / 100 * 1920, p[1] / 100 * 1080]; }
+function seg(a, b, k) { var mx = (a[0] + b[0]) / 2, my = (a[1] + b[1]) / 2, dx = b[0] - a[0], dy = b[1] - a[1], bend = (k % 2 ? -1 : 1) * 0.2;
+  return " Q " + (mx - dy * bend).toFixed(1) + " " + (my + dx * bend).toFixed(1) + " " + b[0].toFixed(1) + " " + b[1].toFixed(1); }
+function pathUpTo(n) { var d = "M " + xy(0).join(" "); for (var i = 1; i <= n; i++) d += seg(xy(i - 1), xy(i), i); return d; }
+function starRow(n) { return [0, 1, 2].map(function (k) { return k < n ? "★" : '<span class="dim">★</span>'; }).join(""); }
+
+function drawHud() {
+  var n = totalStars(), r = rankOf(n), solved = ST.filter(function (x) { return x === "solved"; }).length;
+  var pct = r.next ? Math.round((n - r.from) / (r.next[0] - r.from) * 100) : 100;
+  document.getElementById("hud").innerHTML =
+    '<div class="pill rank" title="Earn stars to rise in rank"><b>' + esc(r.name) + '</b><span class="bar"><i style="width:' + pct + '%"></i></span><small>' + (r.next ? (r.next[0] - n) + " ★ to " + esc(r.next[1]) : "Top rank") + "</small></div>" +
+    '<div class="pill">Cases <b>' + solved + "/" + STOPS.length + "</b> · ★ <b>" + n + "</b> · 🏅 <b>" + badgeCount() + "</b></div>" +
+    '<button class="iconbtn" id="pp">🛂 Passport</button><button class="iconbtn" id="snd" aria-label="Sound on or off">' + (SND.isOn() ? "🔊" : "🔇") + "</button>";
+  document.getElementById("pp").onclick = function () { SND.paper(); passport(); };
+  document.getElementById("snd").onclick = function () { this.textContent = SND.toggle() ? "🔊" : "🔇"; };
+}
+
+function drawChapters() {
+  var votes = getj("tour.votes", {});
+  document.getElementById("chapters").innerHTML = CHAPTERS.map(function (c, i) {
+    return '<button data-ch="' + i + '" class="' + (i === chapterIdx ? "on" : "") + '"><small>' + esc(c.sub) + (c.stops ? "" : votes[c.id] ? " · you asked for it ✓" : " · coming") + "</small>" + (c.icon ? c.icon + " " : "") + esc(c.name) + "</button>";
+  }).join("");
+  document.querySelectorAll("[data-ch]").forEach(function (b) { b.onclick = function () { chapterIdx = +b.getAttribute("data-ch"); SND.paper(); render(); }; });
+}
+
+function drawMap() {
+  var lastSolved = ST.lastIndexOf("solved"), doneTo = TRIP >= 0 ? TRIP : lastSolved + 1;
+  stage.innerHTML = '<div class="mapwrap" id="mw"><div class="map" id="map"><img src="' + window.MAPS[CH.map].img + '" alt="Map of Europe, the Mediterranean and the Near East">' +
+    '<svg class="route" id="route" viewBox="0 0 1920 1080" preserveAspectRatio="none" aria-hidden="true"><path class="all" d="' + pathUpTo(STOPS.length - 1) + '"/>' +
+    (lastSolved >= 0 && doneTo > 0 ? '<path class="done" d="' + pathUpTo(Math.min(STOPS.length - 1, doneTo)) + '"/>' : "") + "</svg>" +
+    STOPS.map(function (s, i) {
+      var st = ST[i], n = starsOf(s.id), p = pin(s);
+      if (TRIP >= 0 && i === TRIP + 1 && st === "open") st = "locked"; // revealed when the train arrives
+      return '<button class="stop ' + st + (s.finale ? " finale" : "") + (i === selected ? " sel" : "") + '" data-i="' + i + '" style="left:' + p[0] + "%;top:" + p[1] + '%" aria-label="' + esc(s.city + ": " + s.title + " (" + (st === "soon" ? "coming soon" : st) + ")") + '">' +
+        '<span class="medal"><img src="' + s.thumb + '" alt=""><span class="num">' + (i + 1) + "</span>" +
+        (st === "soon" ? '<span class="badge">⏳</span>' : st === "locked" ? '<span class="badge">🔒</span>' : "") +
+        (saved(s.id).moth ? '<span class="mothb" title="Collector card found">🦋</span>' : "") +
+        (st === "open" ? '<span class="here">▼</span>' : "") + "</span>" +
+        '<span class="tag">' + esc(s.city) + "</span>" +
+        (st === "solved" ? '<span class="stars">' + starRow(n) + "</span>" : "") + "</button>";
+    }).join("") + "</div></div>";
+  stage.querySelectorAll(".stop").forEach(function (b) { b.onclick = function () { if (TRIP >= 0) return; selected = +b.getAttribute("data-i"); SND.tick(); drawMap(); drawCard(); }; });
+}
+
+function drawLocked() {
+  var c = CHAPTERS[chapterIdx], votes = getj("tour.votes", {});
+  stage.innerHTML = '<div class="chapterlock"><div><div class="big">' + c.icon + '</div><h2>' + esc(c.sub + ": " + c.name) + "</h2><p>" + esc(c.lockedText) + "</p><p>This chapter opens if enough detectives ask for it.</p>" +
+    (votes[c.id] ? '<span class="btn off">✓ You asked for it</span>' : '<button class="btn" id="vote">I want this chapter</button>') + "</div></div>";
+  card.innerHTML = "";
+  var v = document.getElementById("vote"); if (v) v.onclick = function () { votes[c.id] = Date.now(); setj("tour.votes", votes); T("vote", { chapter: c.id }); SND.ding(); drawChapters(); drawLocked(); };
+}
+
+function drawCard() {
+  var s = STOPS[selected], st = ST[selected], n = starsOf(s.id), sv = saved(s.id);
+  var prev = STOPS.filter(function (x, i) { return i < selected && ST[i] === "open"; })[0];
+  var cta = st === "soon" ? '<span class="btn off">Coming soon</span><span class="note">New cases are on their way.</span>'
+    : st === "locked" ? '<span class="btn off">🔒 Locked</span><span class="note">Solve ' + esc(prev ? prev.city : "the previous case") + " first.</span>"
+    : '<a class="btn" href="' + s.href + '">' + (st === "solved" ? "Play again" : sv.started ? "Continue case ›" : "Start case ›") + "</a>" +
+      (st === "solved" ? '<span class="stars" style="font-size:20px">' + starRow(n) + "</span>" : "");
+  var moth = st === "soon" ? "" : '<span class="note">Bonus goals ' + badgeRow(s.id) + (getj("badges." + s.id, []).length < 3 ? " · find the Collector card, solve without hints, solve fast" : " · all earned!") + "</span>";
+  card.innerHTML = '<div class="case"><img src="' + s.thumb + '" alt=""><div class="body">' +
+    '<div class="meta"><span>Case ' + (selected + 1) + " · " + esc(s.city) + '</span><span class="diff ' + s.diff + '">' + s.diff + "</span><span>~" + s.mins + " min</span></div>" +
+    "<h2>" + esc(s.title) + "</h2><p>" + esc(s.blurb) + "</p>" + moth + '<div class="cta">' + cta + "</div></div></div>";
+}
+
+function passport() {
+  var n = totalStars(), cards = STOPS.filter(function (s) { return saved(s.id).moth; }).length;
+  var o = document.createElement("div"); o.className = "overlay";
+  o.innerHTML = '<div class="sheet passport" role="dialog" aria-label="Passport"><h2>PASSPORT</h2><div class="who">Detective · ' + esc(rankOf(n).name) + " · ★ " + n + "</div>" +
+    '<div class="pages">' + STOPS.map(function (s, i) {
+      var k = starsOf(s.id), col = ["#7a1f14", "#1f4a6b", "#2f5e2a", "#6b2a5e", "#7a5a14", "#14596b", "#5e1f1f"][i % 7];
+      return '<div class="page' + (k ? "" : " empty") + '"><span class="city">' + (i + 1) + " · " + esc(s.city) + '</span><div><div class="pstamp" style="--r:' + ((i * 37) % 30 - 15) + "deg;color:" + col + '"><span>' + esc(s.city) + "</span><small>1926</small><span>" + (k ? "★".repeat(k) : "") + "</span></div>" +
+        (k && s.souvenir ? '<div class="souv">Souvenir: ' + esc(s.souvenir) + "</div>" : "") + (k ? badgeRow(s.id) : "") + "</div></div>";
+    }).join("") + "</div>" +
+    '<div class="cfile"><h3>🦋 The Collector file</h3><div style="font-size:14px;opacity:.85">' + cards + " of " + STOPS.length + " black calling cards found. Each case hides one. Someone is paying people across Europe to steal for them. Who?</div>" +
+    '<div class="cards">' + STOPS.map(function (s) { return saved(s.id).moth ? '<span class="ccard got" title="' + esc(s.city) + '">🦋</span>' : '<span class="ccard no">?</span>'; }).join("") + "</div></div>" +
+    '<button class="btn close">Close</button></div>';
+  document.body.appendChild(o);
+  o.addEventListener("click", function (e) { if (e.target === o || e.target.classList.contains("close")) { SND.paper(); o.remove(); } });
+}
+
+// ===== the travel moment: after a case is solved, a train (or ship) carries you to the next city =====
+function pendingTrip() {
+  var seen = getj("tour.seen", []);
+  for (var i = 0; i < STOPS.length; i++) if (ST[i] === "solved" && seen.indexOf(STOPS[i].id) < 0) return i;
+  return -1;
+}
+function celebrate(i) {
+  var s = STOPS[i], n = starsOf(s.id), sv = saved(s.id);
+  var o = document.createElement("div"); o.className = "overlay";
+  o.innerHTML = '<div class="celebrate"><div class="k">Case closed · ' + esc(s.city) + '</div><h2>' + esc(s.title) + '</h2><div class="stars">' + starRow(n) + "</div>" +
+    '<p class="note">Passport stamped' + (s.souvenir ? ". Souvenir: " + esc(s.souvenir) : "") + (sv.moth ? '<br><span class="mothnote">🦋 Collector card added to your file</span>' : "") + "</p>" +
+    '<button class="btn" id="go">' + (i + 1 < STOPS.length ? "Travel on ›" : "Back to the map") + "</button></div>";
+  document.body.appendChild(o);
+  document.getElementById("go").onclick = function () { SND.unlock(); o.remove(); travel(i); };
+}
+function travel(i) {
+  var seen = getj("tour.seen", []); if (seen.indexOf(STOPS[i].id) < 0) seen.push(STOPS[i].id); setj("tour.seen", seen);
+  var map = document.getElementById("map"), mw = document.getElementById("mw"), medal = map.querySelector('.stop[data-i="' + i + '"] .medal');
+  SND.stamp(); if (medal) { var st = document.createElement("span"); st.className = "inkstamp"; st.textContent = "SOLVED"; medal.appendChild(st); }
+  var j = i + 1; if (j >= STOPS.length) { TRIP = -1; SND.fanfare(); return; }
+  var svg = document.getElementById("route"), p = document.createElementNS("http://www.w3.org/2000/svg", "path");
+  p.setAttribute("class", "draw"); p.setAttribute("d", "M " + xy(i).join(" ") + seg(xy(i), xy(j), j)); svg.appendChild(p);
+  var L = p.getTotalLength(); p.style.strokeDasharray = L; p.style.strokeDashoffset = L;
+  var ship = !!STOPS[j].ship, train = document.createElement("div"); train.className = "train"; train.textContent = ship ? "🚢" : "🚂"; map.appendChild(train);
+  var dur = 2600, t0 = performance.now(), lastPuff = 0, W = map.offsetWidth, H = map.offsetHeight;
+  setTimeout(function () { ship ? SND.horn() : SND.whistle(); }, 500);
+  (function step(now) {
+    var k = Math.min(1, (now - t0 - 700) / dur); if (k < 0) return requestAnimationFrame(step);
+    var e = k < .5 ? 2 * k * k : 1 - Math.pow(-2 * k + 2, 2) / 2, pt = p.getPointAtLength(e * L);
+    p.style.strokeDashoffset = L * (1 - e);
+    var x = pt.x / 1920 * W, y = pt.y / 1080 * H; train.style.left = x + "px"; train.style.top = y + "px";
+    if (mw.scrollWidth > mw.clientWidth) mw.scrollLeft = x - mw.clientWidth / 2;
+    if (now - lastPuff > 260 && k < 1) { lastPuff = now; if (!ship) SND.chuff(); var pf = document.createElement("div"); pf.className = "puff"; pf.style.left = x + "px"; pf.style.top = (y - 14) + "px"; map.appendChild(pf); setTimeout(function () { pf.remove(); }, 1500); }
+    if (k < 1) return requestAnimationFrame(step);
+    setTimeout(function () { // arrival
+      train.remove(); TRIP = -1; ST = statuses(); selected = j; drawMap(); drawCard(); drawHud();
+      var b = document.querySelector('.stop[data-i="' + j + '"]'); if (b) b.classList.add("pop");
+      SND.ding();
+      var ban = document.createElement("div"); ban.className = "banner";
+      ban.textContent = playable(STOPS[j]) ? "New case unlocked: " + STOPS[j].city : STOPS[j].city + ": the next case is coming soon";
+      document.body.appendChild(ban); setTimeout(function () { ban.remove(); }, 3600);
+      var more = pendingTrip(); if (more >= 0) setTimeout(function () { TRIP = more; selected = more; render(); celebrate(more); }, 3800);
+    }, 250);
+  })(t0);
+}
+
+function render() {
+  drawHud(); drawChapters();
+  if (!CHAPTERS[chapterIdx].stops) return drawLocked();
+  drawMap(); drawCard();
+  requestAnimationFrame(function () { var mw = document.getElementById("mw"), m = document.getElementById("map"); if (mw && m) mw.scrollLeft = Math.max(0, m.offsetWidth * pin(STOPS[selected])[0] / 100 - mw.clientWidth / 2); });
+}
+
+document.getElementById("reset").onclick = function () {
+  if (!confirm("Erase all progress on this device?")) return;
+  STOPS.forEach(function (x) { try { localStorage.removeItem("episode." + x.id + ".v1"); } catch (e) {} });
+  STOPS.forEach(function (x) { try { localStorage.removeItem("badges." + x.id); } catch (e) {} });
+  ["tour.seen", "tour.votes"].forEach(function (k) { try { localStorage.removeItem(k); } catch (e) {} });
+  location.reload();
+};
+
+TRIP = pendingTrip();
+if (TRIP >= 0) selected = TRIP;
+render();
+if (TRIP >= 0) celebrate(TRIP);
+function T(ev, d) { try { if (window.TRACK) window.TRACK("map", ev, d); } catch (e) {} }
+T("open", { solved: ST.filter(function (x) { return x === "solved"; }).length, stars: totalStars() });
+if (window.TRACK_ASK) setTimeout(window.TRACK_ASK, 1500);
+document.addEventListener("click", function (e) { var a = e.target.closest && e.target.closest(".case .btn[href]"); if (a) T("case_click", { stop: STOPS[selected].id }); });
+</script>
+</body>
+</html>
