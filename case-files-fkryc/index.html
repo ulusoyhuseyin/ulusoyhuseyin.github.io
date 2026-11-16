@@ -3,7 +3,8 @@
 <head>
 <meta charset="utf-8">
 <meta name="robots" content="noindex, nofollow">
-<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<script src="shared/device.js"></script>
 <title>The Detective's Grand Tour</title>
 <meta name="description" content="A motion-comic detective game. Travel the world of 1926, question suspects, catch the liar.">
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -135,12 +136,54 @@ header { display: flex; align-items: flex-end; justify-content: space-between; g
   .map { width: 980px; } .rank .bar { width: 90px; }
 }
 @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation: none !important; transition: none !important; } }
+
+/* ===================== phone layout (html.phone, set by shared/device.js) ===================== */
+.lbl-s { display: none; }
+html.phone body { overflow: hidden; -webkit-tap-highlight-color: transparent; }
+html.phone .wrap { height: 100vh; height: 100dvh; display: flex; flex-direction: column; padding: 0; }
+html.phone header { flex: 0 0 auto; flex-wrap: nowrap; align-items: center; gap: 8px; padding: calc(8px + env(safe-area-inset-top)) 12px 6px; }
+html.phone .brand { min-width: 0; } html.phone .brand .kicker { font-size: 9.5px; letter-spacing: 2.5px; }
+html.phone .brand h1 { font-size: 21px; white-space: nowrap; }
+html.phone .hud { flex-wrap: nowrap; gap: 6px; }
+html.phone .hud .pill:not(.rank) { display: none; }
+html.phone .rank { padding: 4px 10px 5px; } html.phone .rank b { font-size: 13px; } html.phone .rank .bar { width: 64px; } html.phone .rank small { display: none; }
+html.phone .lbl { display: none; } html.phone .lbl-s { display: inline; }
+html.phone .iconbtn { padding: 7px 10px; font-size: 16px; }
+html.phone .chapters { flex: 0 0 auto; margin: 0; padding: 2px 12px 8px; gap: 6px; }
+html.phone .chapters button { padding: 4px 11px; font-size: 13px; border-radius: 99px; }
+html.phone .chapters button small { display: none; }
+html.phone #stage { flex: 1 1 auto; min-height: 0; position: relative; }
+html.phone .mapwrap { height: 100%; overflow: auto; border-radius: 0; scrollbar-width: none; overscroll-behavior: contain; }
+html.phone .mapwrap::-webkit-scrollbar { display: none; }
+html.phone .map { width: auto; height: max(100%, 560px); aspect-ratio: 16 / 9; border-radius: 0; box-shadow: none; }
+html.phone .medal { width: 58px; height: 58px; } html.phone .stop.soon .medal { width: 46px; height: 46px; } html.phone .stop.finale .medal { width: 64px; height: 64px; }
+html.phone .stop .tag { font-size: 13px; }
+html.phone .chapterlock { height: 100%; min-height: 0; aspect-ratio: auto; border-radius: 0; border: 0; }
+html.phone #card { flex: 0 0 auto; position: relative; z-index: 5; }
+html.phone .case { margin: 0; border-radius: 18px 18px 0 0; border-bottom: 0; grid-template-columns: 1fr; gap: 0; box-shadow: 0 -10px 30px rgba(0,0,0,.55); }
+html.phone .case > img { display: none; }
+html.phone .case .body { padding: 12px 16px calc(14px + env(safe-area-inset-bottom)); gap: 4px; }
+html.phone .case h2 { font-size: 21px; }
+html.phone .case p { font-size: 14.5px; line-height: 1.4; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+html.phone .case .note { font-size: 13px; }
+html.phone .cta { margin-top: 6px; } html.phone .cta .btn { flex: 1 1 auto; text-align: center; padding: 13px 18px; font-size: 18px; }
+html.phone .cta .note { flex: 1 1 100%; text-align: center; }
+html.phone .foot { display: none; }
+@media (max-height: 760px) { html.phone .case .body > .note { display: none; } html.phone .case p { -webkit-line-clamp: 1; } }
+html.phone .overlay { align-items: flex-end; padding: 0; }
+html.phone .sheet { width: 100%; max-height: 90vh; border-radius: 18px 18px 0 0; padding-bottom: calc(22px + env(safe-area-inset-bottom)); }
+html.phone .pages { grid-template-columns: repeat(2, 1fr); gap: 8px; }
+html.phone .pstamp { width: 84px; height: 84px; font-size: 11px; }
+html.phone .celebrate { margin-bottom: calc(24px + env(safe-area-inset-bottom)); width: calc(100% - 24px); }
+html.phone .celebrate .btn { width: 100%; padding: 14px; }
+html.phone .consent { bottom: calc(12px + env(safe-area-inset-bottom)); }
+html.phone .banner { top: calc(10px + env(safe-area-inset-top)); }
 </style>
 </head>
 <body>
 <div class="wrap">
   <header>
-    <div class="brand"><p class="kicker">Season one · 1926</p><h1>The Detective’s <i>Grand Tour</i></h1></div>
+    <div class="brand"><p class="kicker">Season one · 1926</p><h1><span class="lbl">The Detective’s </span><i>Grand Tour</i></h1></div>
     <div class="hud" id="hud"></div>
   </header>
   <nav class="chapters" id="chapters"></nav>
@@ -246,9 +289,9 @@ function drawHud() {
   var n = totalStars(), r = rankOf(n), solved = ST.filter(function (x) { return x === "solved"; }).length;
   var pct = r.next ? Math.round((n - r.from) / (r.next[0] - r.from) * 100) : 100;
   document.getElementById("hud").innerHTML =
-    '<div class="pill rank" title="Earn stars to rise in rank"><b>' + esc(r.name) + '</b><span class="bar"><i style="width:' + pct + '%"></i></span><small>' + (r.next ? (r.next[0] - n) + " ★ to " + esc(r.next[1]) : "Top rank") + "</small></div>" +
+    '<div class="pill rank" title="Earn stars to rise in rank"><b>' + esc(r.name) + '<span class="lbl-s"> · ★ ' + n + '</span></b><span class="bar"><i style="width:' + pct + '%"></i></span><small>' + (r.next ? (r.next[0] - n) + " ★ to " + esc(r.next[1]) : "Top rank") + "</small></div>" +
     '<div class="pill">Cases <b>' + solved + "/" + STOPS.length + "</b> · ★ <b>" + n + "</b> · 🏅 <b>" + badgeCount() + "</b></div>" +
-    '<button class="iconbtn" id="pp">🛂 Passport</button><button class="iconbtn" id="snd" aria-label="Sound on or off">' + (SND.isOn() ? "🔊" : "🔇") + "</button>";
+    '<button class="iconbtn" id="pp" aria-label="Passport">🛂<span class="lbl"> Passport</span></button><button class="iconbtn" id="snd" aria-label="Sound on or off">' + (SND.isOn() ? "🔊" : "🔇") + "</button>";
   document.getElementById("pp").onclick = function () { SND.paper(); passport(); };
   document.getElementById("snd").onclick = function () { this.textContent = SND.toggle() ? "🔊" : "🔇"; };
 }
@@ -312,9 +355,9 @@ function passport() {
     }).join("") + "</div>" +
     '<div class="cfile"><h3>🦋 The Collector file</h3><div style="font-size:14px;opacity:.85">' + cards + " of " + STOPS.length + " black calling cards found. Each case hides one. Someone is paying people across Europe to steal for them. Who?</div>" +
     '<div class="cards">' + STOPS.map(function (s) { return saved(s.id).moth ? '<span class="ccard got" title="' + esc(s.city) + '">🦋</span>' : '<span class="ccard no">?</span>'; }).join("") + "</div></div>" +
-    '<button class="btn close">Close</button></div>';
+    '<button class="btn close">Close</button>' + (window.IS_PHONE ? '<p style="text-align:center;margin:14px 0 0"><button class="resetp" style="background:none;border:0;color:#6b5a40;text-decoration:underline;font-size:13px">Reset progress</button></p>' : "") + "</div>";
   document.body.appendChild(o);
-  o.addEventListener("click", function (e) { if (e.target === o || e.target.classList.contains("close")) { SND.paper(); o.remove(); } });
+  o.addEventListener("click", function (e) { if (e.target === o || e.target.classList.contains("close")) { SND.paper(); o.remove(); } if (e.target.classList.contains("resetp")) document.getElementById("reset").click(); });
 }
 
 // ===== the travel moment: after a case is solved, a train (or ship) carries you to the next city =====
@@ -349,6 +392,7 @@ function travel(i) {
     p.style.strokeDashoffset = L * (1 - e);
     var x = pt.x / 1920 * W, y = pt.y / 1080 * H; train.style.left = x + "px"; train.style.top = y + "px";
     if (mw.scrollWidth > mw.clientWidth) mw.scrollLeft = x - mw.clientWidth / 2;
+    if (mw.scrollHeight > mw.clientHeight) mw.scrollTop = y - mw.clientHeight / 2;
     if (now - lastPuff > 260 && k < 1) { lastPuff = now; if (!ship) SND.chuff(); var pf = document.createElement("div"); pf.className = "puff"; pf.style.left = x + "px"; pf.style.top = (y - 14) + "px"; map.appendChild(pf); setTimeout(function () { pf.remove(); }, 1500); }
     if (k < 1) return requestAnimationFrame(step);
     setTimeout(function () { // arrival
@@ -367,7 +411,7 @@ function render() {
   drawHud(); drawChapters();
   if (!CHAPTERS[chapterIdx].stops) return drawLocked();
   drawMap(); drawCard();
-  requestAnimationFrame(function () { var mw = document.getElementById("mw"), m = document.getElementById("map"); if (mw && m) mw.scrollLeft = Math.max(0, m.offsetWidth * pin(STOPS[selected])[0] / 100 - mw.clientWidth / 2); });
+  requestAnimationFrame(function () { var mw = document.getElementById("mw"), m = document.getElementById("map"); if (mw && m) { var pp = pin(STOPS[selected]); mw.scrollLeft = Math.max(0, m.offsetWidth * pp[0] / 100 - mw.clientWidth / 2); mw.scrollTop = Math.max(0, m.offsetHeight * pp[1] / 100 - mw.clientHeight / 2); } });
 }
 
 document.getElementById("reset").onclick = function () {

@@ -10,7 +10,7 @@
   var KEY = "episode." + C.id + ".v1";
   var CALM = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
   var PEOPLE = C.suspects.map(function (s) { return s.id; });
-  var Q = { where: "Where were you at " + C.times.join(" and ") + "?", see: "Who did you see?", suspect: "Who do you think did it?" };
+  var Q = { where: "Where were you at " + (C.times.length > 2 ? C.times.slice(0, -1).join(", ") + " and " + C.times[C.times.length - 1] : C.times.join(" and ")) + "?", see: "Who did you see?", suspect: "Who do you think did it?" };
   var CT = C.crime.time, CP = C.crime.place;
   var S = load() || fresh();
   var view = { screen: S.started ? "hub" : "title", tab: "suspects", who: null };
@@ -90,11 +90,27 @@
       ring(); }, every * (0.7 + Math.random() * 0.6)); })(); }
     function lap() { var b = buf(3, true), n = loop(b, "bandpass", 480, 1.1, 0.03);
       (function wave() { if (!ctx) return; var t = ctx.currentTime, d = 0.6 + Math.random() * 0.9; n.g.gain.linearRampToValueAtTime(0.03 + Math.random() * 0.06, t + d / 2); n.g.gain.linearRampToValueAtTime(0.012, t + d); setTimeout(wave, d * 1000); })(); }
+    function tune(every) { (function go() { setTimeout(function () { if (!ctx) return; var t = ctx.currentTime, o = ctx.createOscillator(), g = ctx.createGain(), f = ctx.createBiquadFilter();
+      o.type = "sawtooth"; o.frequency.value = 440; f.type = "lowpass"; f.frequency.value = 1400; g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(0.012, t + 0.6); g.gain.exponentialRampToValueAtTime(0.0001, t + 3.2);
+      o.connect(f); f.connect(g); g.connect(master); o.start(t); o.stop(t + 3.3); go(); }, every * (0.6 + Math.random() * 0.8)); })(); }
+    function clack(every) { var w = buf(0.08, false); (function go() { if (!ctx) return; var t = ctx.currentTime;
+      [0, 0.16].forEach(function (d) { var s = ctx.createBufferSource(), f = ctx.createBiquadFilter(), g = ctx.createGain(); s.buffer = w; f.type = "bandpass"; f.frequency.value = 900; f.Q.value = 1.5;
+        g.gain.setValueAtTime(0.05, t + d); g.gain.exponentialRampToValueAtTime(0.0001, t + d + 0.07); s.connect(f); f.connect(g); g.connect(master); s.start(t + d); s.stop(t + d + 0.08); });
+      setTimeout(go, every + Math.random() * 60); })(); }
+    function crickets() { (function go() { setTimeout(function () { if (!ctx) return; var t = ctx.currentTime;
+      for (var k = 0; k < 3; k++) { var o = ctx.createOscillator(), g = ctx.createGain(), at = t + k * 0.09; o.frequency.value = 4300; g.gain.setValueAtTime(0.0001, at); g.gain.exponentialRampToValueAtTime(0.006, at + 0.02); g.gain.exponentialRampToValueAtTime(0.0001, at + 0.06); o.connect(g); g.connect(master); o.start(at); o.stop(at + 0.07); }
+      go(); }, 700 + Math.random() * 1600); })(); }
     var BEDS = {
       bakery: function () { loop(buf(4, true), "lowpass", 170, 0.7, 0.07); crackle(380, 0.025); },
       alpine: function () { var w = loop(buf(4, false), "bandpass", 450, 0.8, 0.018); lfo(w.f.frequency, 0.06, 220); lfo(w.g.gain, 0.11, 0.012); crackle(520, 0.015); },
       canal: function () { lap(); bell(42000); },
-      room: function () { loop(buf(4, true), "lowpass", 140, 0.7, 0.04); }
+      room: function () { loop(buf(4, true), "lowpass", 140, 0.7, 0.04); },
+      // opera house backstage: a far-off murmuring audience, now and then an instrument tuning its A
+      opera: function () { var m = loop(buf(4, true), "bandpass", 320, 0.9, 0.05); lfo(m.g.gain, 0.07, 0.02); tune(26000); },
+      // night train: low rumble and the double clack of the wheels on the rail joints
+      train: function () { loop(buf(4, true), "lowpass", 110, 0.7, 0.09); clack(1150); },
+      // museum gala: a soft crowd through the walls and crickets from the Nile garden
+      gala: function () { var m = loop(buf(4, true), "bandpass", 380, 0.9, 0.035); lfo(m.g.gain, 0.05, 0.015); crickets(); }
     };
     function apply() { if (master) master.gain.setTargetAtTime(on ? (ducked ? 0.3 : 1) : 0, ctx.currentTime, 0.25); /* room sound steps back while someone speaks */ if (music) music.volume = on ? (ducked ? MUSIC_VOL * 0.35 : MUSIC_VOL) : 0; }
     return {
@@ -149,7 +165,7 @@
     var portrait = window.matchMedia && window.matchMedia("(orientation: portrait) and (pointer: coarse)").matches;
     try {
       if (on) {
-        if (!portrait || !document.documentElement.requestFullscreen || !(screen.orientation && screen.orientation.lock)) return false;
+        if (!portrait || window.IS_PHONE || !document.documentElement.requestFullscreen || !(screen.orientation && screen.orientation.lock)) return false;
         document.documentElement.requestFullscreen().then(function () { return screen.orientation.lock("landscape"); }).catch(function () {});
         return true;
       }
@@ -166,7 +182,7 @@
     ov.innerHTML = '<div class="stage"></div><div class="cprog"></div><button class="skip">Skip ›</button>' +
       '<div class="rotate"><span class="ri">📱↻</span> Turn your phone sideways for the full picture</div>';
     document.body.appendChild(ov);
-    var turned = landscape(true);
+    var turned = landscape(true); // phones get a portrait comic layout instead (see noir.css "phone")
     var stage = ov.querySelector(".stage"), i = -1, timer = null, ended = false;
     function fx(list) { return (list || []).map(function (f) { return '<div class="fx ' + f + '"></div>'; }).join(""); }
     function next() {
@@ -175,9 +191,11 @@
       var p = panels[i];
       var base = p.dur || (p.caption ? Math.max(4200, p.caption.length * 70) : 3600);
       var el = document.createElement("div"); el.className = "panel in";
-      el.innerHTML = '<div class="cam ' + (CALM ? "" : p.move || "push") + '" style="animation-duration:' + (base + 2500) + 'ms"><img src="' + esc(p.img) + '" alt=""></div>' + fx(p.fx) + '<div class="vignette"></div>' +
-        (p.sfx ? '<div class="sfx">' + esc(p.sfx) + "</div>" : "") + (p.bubble ? '<div class="cbubble">' + esc(p.bubble) + "</div>" : "") +
-        (p.caption ? '<div class="caption"><span>' + esc(p.caption) + "</span></div>" : "");
+      // phones held upright: the wide panel sweeps across a tall frame (img animation), the words sit below it (.cwords)
+      var dur = (base + 2500) + "ms", sweep = CALM ? "" : p.move === "panLeft" ? "sweepL" : "sweepR";
+      el.innerHTML = '<div class="camclip"><div class="cam ' + (CALM ? "" : p.move || "push") + '" style="animation-duration:' + dur + '"><img class="' + sweep + '" style="animation-duration:' + dur + '" src="' + esc(p.img) + '" alt=""></div></div>' + fx(p.fx) + '<div class="vignette"></div>' +
+        (p.sfx ? '<div class="sfx">' + esc(p.sfx) + "</div>" : "") + '<div class="cwords">' + (p.bubble ? '<div class="cbubble">' + esc(p.bubble) + "</div>" : "") +
+        (p.caption ? '<div class="caption"><span>' + esc(p.caption) + "</span></div>" : "") + "</div>";
       stage.appendChild(el);
       var olds = stage.querySelectorAll(".panel"); if (olds.length > 1) { var o = olds[0]; o.classList.add("out"); setTimeout(function () { o.remove(); }, 900); }
       if (p.sfx) { stage.classList.remove("shake"); void stage.offsetWidth; stage.classList.add("shake"); }
@@ -200,7 +218,7 @@
   function render() { closeModal(); if (view.screen === "title") return title(); if (view.screen === "end") return end(); hub(); }
 
   function title() {
-    h('<div class="title"><img class="hero" src="img/co_1.jpg" alt=""><a class="btn ghost small maplink" href="../index.html" style="position:absolute;left:14px;top:14px;z-index:2">‹ Map</a><div class="tcard"><p class="kicker">' + esc(C.city) + ' · 1926 · <span class="diff easy">Easy</span></p><h1>' + esc(C.title) + '</h1><p class="tag">' + esc(C.tagline) + '</p><button class="btn big" id="go">Open the case</button><p class="muted small">Bonus goals: ' + GOALS.map(function (g) { return g.icon + " " + esc(g.text); }).join(" · ") + '</p><p class="muted small">Sound on. About ' + (C.mins || 10) + ' minutes.' + (C.tutorial ? " Your first case comes with a guide." : "") + '</p></div></div>');
+    h('<div class="title"><img class="hero" src="img/co_1.jpg" alt=""><a class="btn ghost small maplink" href="../index.html" style="position:absolute;left:14px;top:14px;z-index:2">‹ Map</a><div class="tcard"><p class="kicker">' + esc(C.city) + ' · 1926 · <span class="diff ' + (C.level || "easy") + '">' + (C.level === "medium" ? "Medium" : C.level === "hard" ? "Hard" : "Easy") + '</span></p><h1>' + esc(C.title) + '</h1><p class="tag">' + esc(C.tagline) + '</p><button class="btn big" id="go">Open the case</button><p class="muted small">Bonus goals: ' + GOALS.map(function (g) { return g.icon + " " + esc(g.text); }).join(" · ") + '</p><p class="muted small">Sound on. About ' + (C.mins || 10) + ' minutes.' + (C.tutorial ? " Your first case comes with a guide." : "") + '</p></div></div>');
     on("#go", function () {
       track("start", { replay: !!S.solved });
       var co = C.coldopen.map(function (p) { return { img: img(p.id), move: p.move, fx: p.fx, sfx: p.sfx, caption: p.caption, bubble: p.bubble, audio: p.id }; });
@@ -210,10 +228,10 @@
   }
 
   function hub() {
-    var tabs = [["suspects", "Suspects"], ["scene", "Crime scene"], ["notebook", "Notebook"], ["accuse", "Accuse"]];
+    var tabs = [["suspects", "Suspects", "👥"], ["scene", "Crime scene", "🔦"], ["notebook", "Notebook", "📓"], ["accuse", "Accuse", "⚖️"]];
     var body = view.who ? profile(view.who) : { suspects: suspectsTab, scene: sceneTab, notebook: notebookTab, accuse: accuseTab }[view.tab]();
     h('<div class="topbar"><a class="btn ghost small maplink" href="../index.html">‹ Map</a><h2>' + esc(C.title) + '</h2><button class="btn ghost small" id="snd" aria-label="Sound on or off">' + (BG.on() ? "🔊" : "🔇") + '</button> <button class="btn ghost small" id="hint">Hint</button></div>' +
-      '<nav class="tabs">' + tabs.map(function (t) { return '<button data-tab="' + t[0] + '" class="' + (view.tab === t[0] && !view.who ? "on" : "") + '">' + t[1] + (t[0] === "notebook" && S.contra ? " ✓" : "") + "</button>"; }).join("") + "</nav>" + body.html);
+      '<nav class="tabs">' + tabs.map(function (t) { return '<button data-tab="' + t[0] + '" class="' + (view.tab === t[0] && !view.who ? "on" : "") + '"><span class="ti">' + t[2] + "</span>" + t[1] + (t[0] === "notebook" && S.contra ? " ✓" : "") + "</button>"; }).join("") + "</nav>" + body.html);
     on("[data-tab]", function () { view.tab = this.getAttribute("data-tab"); view.who = null; sel = []; stop(); render(); });
     on("#hint", hint);
     on("#snd", function () { this.textContent = BG.toggle() ? "🔊" : "🔇"; });
@@ -248,11 +266,14 @@
     var found = C.clues.filter(function (c) { return S.found.indexOf(c.id) >= 0; });
     var nEv = C.clues.filter(function (c) { return !c.collector; }).length, fEv = found.filter(function (c) { return !c.collector; }).length;
     return {
-      html: '<p class="muted small">' + esc(C.scene.title) + ". " + fEv + "/" + nEv + ' clues found. Drag your torch, tap anything that glints.' + (S.moth ? ' <span style="color:var(--teal)">· Collector card found</span>' : "") + '</p><div class="scenepic dark"><img src="img/scene.jpg" alt="' + esc(C.scene.title) + '">' +
-        C.clues.map(function (c) { return '<button class="spot' + (c.collector ? " moth" : "") + (S.found.indexOf(c.id) >= 0 ? " found" : "") + '" data-clue="' + c.id + '" style="left:' + c.spot[0] * 100 + "%;top:" + c.spot[1] * 100 + '%" aria-label="Examine ' + esc(c.title) + '"></button>'; }).join("") + '<div class="torch"></div></div>' +
+      html: '<p class="muted small">' + esc(C.scene.title) + ". " + fEv + "/" + nEv + ' clues found. ' + (window.IS_PHONE ? "Swipe to look around, tap anything that glints." : "Drag your torch, tap anything that glints.") + (S.moth ? ' <span style="color:var(--teal)">· Collector card found</span>' : "") + '</p><div class="scenescroll"><div class="scenepic dark"><img src="img/scene.jpg" alt="' + esc(C.scene.title) + '">' +
+        C.clues.map(function (c) { return '<button class="spot' + (c.collector ? " moth" : "") + (S.found.indexOf(c.id) >= 0 ? " found" : "") + '" data-clue="' + c.id + '" style="left:' + c.spot[0] * 100 + "%;top:" + c.spot[1] * 100 + '%" aria-label="Examine ' + esc(c.title) + '"></button>'; }).join("") + '<div class="torch"></div></div></div>' +
         '<div class="cluegrid">' + found.map(function (c) { return '<button class="cl" data-clue="' + c.id + '"><img src="' + img("clue_" + c.id) + '" alt=""><span>' + esc(c.title) + "</span></button>"; }).join("") + "</div>",
       wire: function () {
-        var sp = $(".scenepic");
+        var sp = $(".scenepic"), sc = $(".scenescroll");
+        // phone: the scene is shown tall and wide; start in the middle, swipe to look around
+        var centre = function () { if (sc.scrollWidth > sc.clientWidth && !sc.dataset.c) { sc.dataset.c = 1; sc.scrollLeft = (sc.scrollWidth - sc.clientWidth) / 2; } };
+        var si = sp.querySelector("img"); if (si.complete) centre(); else si.addEventListener("load", centre);
         var move = function (e) { var r = sp.getBoundingClientRect(), t = e.touches ? e.touches[0] : e; sp.style.setProperty("--x", t.clientX - r.left + "px"); sp.style.setProperty("--y", t.clientY - r.top + "px"); };
         sp.addEventListener("pointermove", move); sp.addEventListener("pointerdown", move); sp.addEventListener("touchmove", move, { passive: true });
         on("[data-clue]", function () { openClue(this.getAttribute("data-clue")); });
