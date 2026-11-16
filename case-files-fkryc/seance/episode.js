@@ -30,8 +30,16 @@
 
   // ---------- audio + speaking ----------
   function setSpeaking(on) { document.body.classList.toggle("speaking", !!on); }
-  audio.addEventListener("playing", function () { setSpeaking(true); });
-  ["pause", "ended", "error"].forEach(function (ev) { audio.addEventListener(ev, function () { if (!typingNow) setSpeaking(false); }); });
+  // background music (audio/music.m4a): quiet loop, steps back while someone speaks; shares the on/off setting with the map
+  var MUSIC_VOL = 0.16, music = null, ducked = false;
+  var soundOn = (function () { try { return JSON.parse(localStorage.getItem("tour.sound")) !== false; } catch (e) { return true; } })();
+  function musicVol() { if (music) music.volume = soundOn ? (ducked ? MUSIC_VOL * 0.35 : MUSIC_VOL) : 0; }
+  function startMusic() { if (music) return; try { music = new Audio("audio/music.m4a"); music.loop = true; musicVol(); music.addEventListener("error", function () { music = null; }); music.play().catch(function () {}); } catch (e) { music = null; } }
+  ["pointerdown", "keydown"].forEach(function (ev) { window.addEventListener(ev, startMusic, { once: true }); });
+  function toggleSound() { soundOn = !soundOn; try { localStorage.setItem("tour.sound", JSON.stringify(soundOn)); } catch (e) {} audio.muted = !soundOn; musicVol(); return soundOn; }
+  audio.muted = !soundOn;
+  audio.addEventListener("playing", function () { setSpeaking(true); ducked = true; musicVol(); });
+  ["pause", "ended", "error"].forEach(function (ev) { audio.addEventListener(ev, function () { ducked = false; musicVol(); if (!typingNow) setSpeaking(false); }); });
   function play(key) { try { audio.pause(); audio.src = "audio/" + key + ".m4a"; audio.play().catch(function () {}); } catch (e) {} }
   function stop() { try { audio.pause(); } catch (e) {} }
   function typeOut(el, text, talk) {
@@ -132,10 +140,11 @@
   function hub() {
     var tabs = [["suspects", "Suspects", "👥"], ["scene", "Crime scene", "🔦"], ["seating", "Seating", "🪑"], ["accuse", "Accuse", "⚖️"]];
     var body = view.who ? profile(view.who) : { suspects: suspectsTab, scene: sceneTab, seating: seatingTab, accuse: accuseTab }[view.tab]();
-    h('<div class="topbar"><a class="btn ghost small" href="../index.html" style="text-decoration:none">‹ Map</a><h2 style="flex:1;text-align:center">' + esc(C.title) + '</h2><button class="btn ghost small" id="hint">Hint (' + (C.hints.length - S.hints) + ')</button></div>' +
+    h('<div class="topbar"><a class="btn ghost small" href="../index.html" style="text-decoration:none">‹ Map</a><h2 style="flex:1;text-align:center">' + esc(C.title) + '</h2><button class="btn ghost small" id="snd" aria-label="Sound on or off">' + (soundOn ? "🔊" : "🔇") + '</button> <button class="btn ghost small" id="hint">Hint (' + (C.hints.length - S.hints) + ')</button></div>' +
       '<nav class="tabs">' + tabs.map(function (t) { return '<button data-tab="' + t[0] + '" class="' + (view.tab === t[0] && !view.who ? "on" : "") + '"><span class="ti">' + t[2] + "</span>" + t[1] + (t[0] === "seating" && S.insight ? " ✓" : "") + "</button>"; }).join("") + "</nav>" + body.html);
     on("[data-tab]", function () { view.tab = this.getAttribute("data-tab"); view.who = null; stop(); render(); });
     on("#hint", hint);
+    on("#snd", function () { this.textContent = toggleSound() ? "🔊" : "🔇"; });
     if (body.wire) body.wire();
   }
 

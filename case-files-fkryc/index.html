@@ -96,6 +96,7 @@ header { display: flex; align-items: flex-end; justify-content: space-between; g
 .note { color: var(--muted); font-size: 14px; }
 .mothnote { color: var(--moth); font-size: 13px; }
 .foot { text-align: center; color: var(--muted); font-size: 13px; margin: 18px 0 40px; }
+.foot .credits { font-size: 11px; opacity: .75; }
 .foot button { background: none; border: 0; color: var(--muted); text-decoration: underline; font-size: 13px; }
 
 /* overlays: passport, celebration */
@@ -189,7 +190,7 @@ html.phone .banner { top: calc(10px + env(safe-area-inset-top)); }
   <nav class="chapters" id="chapters"></nav>
   <div id="stage"></div>
   <div id="card"></div>
-  <p class="foot">Private preview · © 2026 The Detective’s Grand Tour. All rights reserved.<br>Progress is saved on this device. <button id="reset">Reset progress</button></p>
+  <p class="foot">Private preview · © 2026 The Detective’s Grand Tour. All rights reserved.<br>Progress is saved on this device. <button id="reset">Reset progress</button><br><span class="credits">Music: “Mystery Bazaar”, “Ibn Al-Noor” and “Court of the Queen” by Kevin MacLeod (incompetech.com), licensed under CC BY 4.0. Other music: Grieg, Satie, Rossini, Offenbach, Strauss (public domain recordings).</span></p>
 </div>
 
 <script src="tour/chapter1.js"></script>
@@ -219,6 +220,7 @@ var CHAPTERS = [
 ];
 var RANKS = [[0, "Rookie"], [3, "Junior Detective"], [6, "Detective"], [9, "Inspector"], [13, "Chief Inspector"], [18, "Legend of the Yard"]];
 var DEV = /[?&]dev/.test(location.search);
+var CREDITS = "Music: “Mystery Bazaar”, “Ibn Al-Noor” and “Court of the Queen” by Kevin MacLeod (incompetech.com), licensed under CC BY 4.0. Other music: Grieg, Satie, Rossini, Offenbach, Strauss (public domain recordings).";
 var CH = CHAPTERS[0], STOPS = CH.stops, PINS = window.MAPS[CH.map].pins;
 
 // ===== storage (reads and writes may fail in private windows) =====
@@ -248,9 +250,11 @@ var SND = (function () {
   function tone(type, f0, f1, dur, vol, at) { if (!ctx) return; var t = ctx.currentTime + (at || 0), o = ctx.createOscillator(), g = ctx.createGain(); o.type = type; o.frequency.setValueAtTime(f0, t); if (f1) o.frequency.exponentialRampToValueAtTime(f1, t + dur); env(g, t, 0.005, vol, dur); o.connect(g); g.connect(master); o.start(t); o.stop(t + dur + 0.05); }
   function burst(buf, type, freq, q, dur, vol, at) { if (!ctx) return; var t = ctx.currentTime + (at || 0), s = ctx.createBufferSource(), f = ctx.createBiquadFilter(), g = ctx.createGain(); s.buffer = buf; f.type = type; f.frequency.value = freq; f.Q.value = q; env(g, t, 0.004, vol, dur); s.connect(f); f.connect(g); g.connect(master); s.start(t); s.stop(t + dur + 0.05); }
   var api = {
-    unlock: function () { init(); if (ctx && ctx.state === "suspended") ctx.resume(); if (on) api.ambience(); },
+    unlock: function () { init(); if (ctx && ctx.state === "suspended") ctx.resume(); if (on) api.ambience(); api.music(); },
+    // map music: Grieg, Morning Mood (Musopen, public domain), quiet loop under the harbour sound
+    music: function () { if (!api._m) { try { api._m = new Audio("tour/audio/music.m4a"); api._m.loop = true; api._m.volume = 0.22; } catch (e) { return; } } if (on) api._m.play().catch(function () {}); else api._m.pause(); },
     isOn: function () { return on; },
-    toggle: function () { on = !on; setj("tour.sound", on); init(); if (master) master.gain.setTargetAtTime(on ? 1 : 0, ctx.currentTime, 0.05); if (on) api.ambience(); return on; },
+    toggle: function () { on = !on; setj("tour.sound", on); init(); if (master) master.gain.setTargetAtTime(on ? 1 : 0, ctx.currentTime, 0.05); if (on) api.ambience(); api.music(); return on; },
     tick: function () { tone("triangle", 1800, 1200, 0.05, 0.08); },
     paper: function () { if (ctx) burst(white(0.3), "bandpass", 2400, 0.7, 0.22, 0.25); },
     stamp: function (at) { if (!ctx) return; tone("sine", 140, 45, 0.25, 0.9, at); burst(white(0.1), "lowpass", 900, 0.8, 0.06, 0.6, at); },
@@ -355,7 +359,7 @@ function passport() {
     }).join("") + "</div>" +
     '<div class="cfile"><h3>🦋 The Collector file</h3><div style="font-size:14px;opacity:.85">' + cards + " of " + STOPS.length + " black calling cards found. Each case hides one. Someone is paying people across Europe to steal for them. Who?</div>" +
     '<div class="cards">' + STOPS.map(function (s) { return saved(s.id).moth ? '<span class="ccard got" title="' + esc(s.city) + '">🦋</span>' : '<span class="ccard no">?</span>'; }).join("") + "</div></div>" +
-    '<button class="btn close">Close</button>' + (window.IS_PHONE ? '<p style="text-align:center;margin:14px 0 0"><button class="resetp" style="background:none;border:0;color:#6b5a40;text-decoration:underline;font-size:13px">Reset progress</button></p>' : "") + "</div>";
+    '<button class="btn close">Close</button><p class="credits" style="text-align:center;font-size:11px;opacity:.7;margin:14px 0 0">' + CREDITS + '</p>' + (window.IS_PHONE ? '<p style="text-align:center;margin:14px 0 0"><button class="resetp" style="background:none;border:0;color:#6b5a40;text-decoration:underline;font-size:13px">Reset progress</button></p>' : "") + "</div>";
   document.body.appendChild(o);
   o.addEventListener("click", function (e) { if (e.target === o || e.target.classList.contains("close")) { SND.paper(); o.remove(); } if (e.target.classList.contains("resetp")) document.getElementById("reset").click(); });
 }
