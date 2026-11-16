@@ -370,6 +370,11 @@
     }
     if (!C.clues.some(function (c) { return c.proof && S.found.indexOf(c.id) >= 0; }))
       return modal("<h3>Not so fast</h3><p>You may be right, but you’ll need evidence to make it stick. Search the crime scene first.</p><button class=\"btn\" data-close>Search the scene</button>", function () { view.tab = "scene"; render(); });
+    var can = S.contra || breakers(id).some(function (k) { var q = k.split(":"); return heard(q[0], q[1]); });
+    if (!can) {
+      track("accuse_blocked", { who: id });
+      return modal("<h3>You may be right, but...</h3><p>" + esc(short(id)) + " has an alibi, and right now you can’t break it. Ask everyone <b>where they were</b> and <b>who they saw</b>. Somebody’s account won’t fit with " + esc(short(id)) + "’s story.</p><button class=\"btn\" data-close>Question the suspects</button>", function () { view.tab = "suspects"; view.who = null; render(); });
+    }
     track("accuse", { who: id, ok: true });
     confront(id);
   }
@@ -409,6 +414,12 @@
       S.wrong++; save(); track("confront_wrong", { step: step + 1, n: S.wrong }); b.classList.add("no"); b.disabled = true; shake();
       if (S.wrong >= 3) { stop(); ov.remove(); S.failed = true; S.t1 = Date.now(); save(); view.screen = "end"; return render(); }
       say(["Is that all, Detective?", "Ha! That proves nothing.", "You are wasting my time."][Math.min(2, S.wrong - 1)] + " (stars left: " + stars() + ")", null);
+      if (!ov.querySelector(".cf-card:not([disabled])") || step === 0 && !Array.prototype.some.call(ov.querySelectorAll(".cf-card:not([disabled])"), function (c) { return good.indexOf(c.getAttribute("data-v")) >= 0; })) {
+        var back = document.createElement("div"); back.className = "cf-done";
+        back.innerHTML = '<p class="muted small">None of your notes breaks this story yet. Go back and ask more questions.</p><button class="btn" id="cfback">‹ Back to the case</button>';
+        ov.querySelector(".cf-ask").appendChild(back);
+        back.querySelector("#cfback").onclick = function () { track("confront_back", { step: step + 1 }); stop(); ov.remove(); view.tab = "suspects"; view.who = null; render(); };
+      }
     }
     say(F.deny, id + "_deny");
     ask("Present the statement that breaks " + esc(short(id)) + "’s story", offered.map(function (k) { var p = k.split(":");
@@ -495,10 +506,10 @@
     coachShown = S.tut;
     if (!coachEl) { coachEl = document.createElement("div"); coachEl.className = "coach"; coachEl.setAttribute("role", "status"); document.body.appendChild(coachEl); }
     coachEl.innerHTML = '<div class="cicon">🔎</div><div class="ctext"><div class="chead">Detective’s notes · ' + (S.tut + 1) + "/" + STEPS.length + "</div><p>" + st.text + '</p><div class="crow">' +
-      (st.button ? '<button class="btn small" id="cnext">' + st.button + "</button>" : "") + '<button class="cskip" id="cskip">Skip tutorial</button></div></div>';
+      (st.button ? '<button class="btn small" id="cnext">' + st.button + "</button>" : "") + (S.tut >= 3 ? '<button class="cskip" id="cskip">Skip tutorial</button>' : "") + "</div></div>";
     coachEl.classList.remove("cin"); void coachEl.offsetWidth; coachEl.classList.add("cin");
     var nx = coachEl.querySelector("#cnext"); if (nx) nx.addEventListener("click", function () { S.tut++; save(); coach(); });
-    coachEl.querySelector("#cskip").addEventListener("click", function () { track("guide_skip", { step: S.tut + 1 }); S.tut = STEPS.length; save(); coach(); });
+    var sk = coachEl.querySelector("#cskip"); if (sk) sk.addEventListener("click", function () { track("guide_skip", { step: S.tut + 1 }); S.tut = STEPS.length; save(); coach(); });
   }
 
   // ---------- modal, toast ----------

@@ -15,7 +15,7 @@
     var row = { ts: new Date().toISOString(), pid: pid, sid: sid, where: where, ev: ev, sec: Math.round((Date.now() - t0) / 1000), data: data || {} };
     var log = []; try { log = JSON.parse(get("tour.log")) || []; } catch (e) {}
     log.push(row); if (log.length > MAX_LOCAL) log = log.slice(-MAX_LOCAL); set("tour.log", JSON.stringify(log));
-    if (ENDPOINT && navigator.sendBeacon) { try { navigator.sendBeacon(ENDPOINT, JSON.stringify(row)); } catch (e) {} }
+    if (ENDPOINT && navigator.sendBeacon && !navigator.webdriver && !/^(localhost|127\.|0\.0\.0\.0|$)/.test(location.hostname)) { /* test robots and local copies keep events on the device only */ try { navigator.sendBeacon(ENDPOINT, JSON.stringify(row)); } catch (e) {} }
   };
 
   // Ask once, politely, on the map page.
