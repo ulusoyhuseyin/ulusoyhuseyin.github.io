@@ -31,10 +31,19 @@
   // ---------- audio + speaking ----------
   function setSpeaking(on) { document.body.classList.toggle("speaking", !!on); }
   // background music (audio/music.m4a): quiet loop, steps back while someone speaks; shares the on/off setting with the map
-  var MUSIC_VOL = 0.16, music = null, ducked = false;
+  // music only in the story moments (title, comics, the finale, end screen); almost silent under voices; fades, pauses at 0
+  var MUSIC_VOL = 0.16, music = null, ducked = false, scene = true, mvol = 0, fader = null;
   var soundOn = (function () { try { return JSON.parse(localStorage.getItem("tour.sound")) !== false; } catch (e) { return true; } })();
-  function musicVol() { if (music) music.volume = soundOn ? (ducked ? MUSIC_VOL * 0.35 : MUSIC_VOL) : 0; }
-  function startMusic() { if (music) return; try { music = new Audio("audio/music.m4a"); music.loop = true; musicVol(); music.addEventListener("error", function () { music = null; }); music.play().catch(function () {}); } catch (e) { music = null; } }
+  var musOn = (function () { try { return JSON.parse(localStorage.getItem("tour.music")) !== false; } catch (e) { return true; } })();
+  function musicVol() {
+    if (!music) return; clearInterval(fader);
+    var goal = soundOn && musOn && scene ? (ducked ? MUSIC_VOL * 0.1 : MUSIC_VOL) : 0; if (goal > 0 && music.paused) music.play().catch(function () {});
+    fader = setInterval(function () { mvol += Math.max(-0.012, Math.min(0.006, goal - mvol)); if (Math.abs(goal - mvol) < 0.004) mvol = goal;
+      try { music.volume = Math.max(0, Math.min(1, mvol)); } catch (e) {} if (mvol === goal) { clearInterval(fader); if (goal === 0) music.pause(); } }, 50);
+  }
+  function setScene(v) { v = !!v; if (v === scene) return; scene = v; musicVol(); }
+  function startMusic() { if (music) return; try { music = new Audio("audio/music.m4a"); music.loop = true; music.volume = 0; music.addEventListener("error", function () { music = null; }); musicVol(); } catch (e) { music = null; } }
+  function toggleMusic() { musOn = !musOn; try { localStorage.setItem("tour.music", JSON.stringify(musOn)); } catch (e) {} musicVol(); return musOn; }
   ["pointerdown", "keydown"].forEach(function (ev) { window.addEventListener(ev, startMusic, { once: true }); });
   function toggleSound() { soundOn = !soundOn; try { localStorage.setItem("tour.sound", JSON.stringify(soundOn)); } catch (e) {} audio.muted = !soundOn; musicVol(); return soundOn; }
   audio.muted = !soundOn;
@@ -87,7 +96,7 @@
   // ---------- motion-comic player ----------
   // panels: {img, move, fx[], sfx, caption, bubble, audio, dur}
   function comic(panels, onDone) {
-    stop();
+    stop(); setScene(true);
     var ov = document.createElement("div"); ov.className = "comic";
     ov.innerHTML = '<div class="stage"></div><div class="cprog"></div><button class="skip">Skip ›</button>' +
       '<div class="rotate"><span class="ri">📱↻</span> Turn your phone sideways for the full picture</div>';
@@ -117,14 +126,14 @@
         timer = setTimeout(next, base + 6000);
       } else timer = setTimeout(next, base);
     }
-    function finish() { if (ended) return; ended = true; clearTimeout(timer); stop(); if (turned) landscape(false); ov.classList.add("bye"); setTimeout(function () { ov.remove(); if (onDone) onDone(); }, 500); }
+    function finish() { if (ended) return; ended = true; clearTimeout(timer); stop(); if (turned) landscape(false); ov.classList.add("bye"); setTimeout(function () { ov.remove(); if (onDone) onDone(); setScene(view.screen !== "hub" || !!document.querySelector(".comic") || S.step > 0 && !S.solved); }, 500); }
     stage.addEventListener("click", next);
     ov.querySelector(".skip").addEventListener("click", finish);
     next();
   }
 
   // ---------- screens ----------
-  function render() { closeModal(); if (view.screen === "title") return title(); if (view.screen === "end") return end(); hub(); }
+  function render() { closeModal(); setScene(view.screen !== "hub"); if (view.screen === "title") return title(); if (view.screen === "end") return end(); hub(); }
 
   function title() {
     h('<div class="title"><img class="hero" src="img/co_p1.jpg" alt=""><div class="tcard"><p class="kicker">A case file · 1926</p><h1>' + esc(C.title) + '</h1><p class="tag">' + esc(C.tagline) + '</p><button class="btn big" id="go">Open the case</button><p class="muted small">Sound on. About 20 minutes. One answer you can prove.</p></div></div>');
@@ -140,11 +149,12 @@
   function hub() {
     var tabs = [["suspects", "Suspects", "👥"], ["scene", "Crime scene", "🔦"], ["seating", "Seating", "🪑"], ["accuse", "Accuse", "⚖️"]];
     var body = view.who ? profile(view.who) : { suspects: suspectsTab, scene: sceneTab, seating: seatingTab, accuse: accuseTab }[view.tab]();
-    h('<div class="topbar"><a class="btn ghost small" href="../index.html" style="text-decoration:none">‹ Map</a><h2 style="flex:1;text-align:center">' + esc(C.title) + '</h2><button class="btn ghost small" id="snd" aria-label="Sound on or off">' + (soundOn ? "🔊" : "🔇") + '</button> <button class="btn ghost small" id="hint">Hint (' + (C.hints.length - S.hints) + ')</button></div>' +
+    h('<div class="topbar"><a class="btn ghost small" href="../index.html" style="text-decoration:none">‹ Map</a><h2 style="flex:1;text-align:center">' + esc(C.title) + '</h2><button class="btn ghost small" id="snd" aria-label="Sound on or off">' + (soundOn ? "🔊" : "🔇") + '</button> <button class="btn ghost small' + (musOn ? "" : " off") + '" id="mus" aria-label="Music on or off" title="Music">🎵</button> <button class="btn ghost small" id="hint">Hint (' + (C.hints.length - S.hints) + ')</button></div>' +
       '<nav class="tabs">' + tabs.map(function (t) { return '<button data-tab="' + t[0] + '" class="' + (view.tab === t[0] && !view.who ? "on" : "") + '"><span class="ti">' + t[2] + "</span>" + t[1] + (t[0] === "seating" && S.insight ? " ✓" : "") + "</button>"; }).join("") + "</nav>" + body.html);
     on("[data-tab]", function () { view.tab = this.getAttribute("data-tab"); view.who = null; stop(); render(); });
     on("#hint", hint);
     on("#snd", function () { this.textContent = toggleSound() ? "🔊" : "🔇"; });
+    on("#mus", function () { this.classList.toggle("off", !toggleMusic()); });
     if (body.wire) body.wire();
   }
 
@@ -303,6 +313,7 @@
     return o;
   }
   function finaleStep() {
+    setScene(true); // the finale is a story moment
     var st = C.finale.steps[S.step], k = S.step;
     var opts = evidenceOptions();
     modal('<div class="react"><img src="' + img("face_celeste") + '" alt=""><p><b>' + esc(st.ask) + "</b></p></div>" + '<div class="evlist">' + opts.map(function (o) { return '<button class="ev" data-pf="' + o[0] + '"><img src="' + img(o[2]) + '" alt=""><span>' + esc(o[1]) + "</span></button>"; }).join("") + "</div>" +

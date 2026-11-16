@@ -73,8 +73,9 @@
 
   // ---------- room sound + music bed: ambience is synthesised (no files); audio/music.m4a is optional ----------
   var BG = (function () {
-    var ctx = null, master = null, music = null, started = false, ducked = false;
+    var ctx = null, master = null, music = null, started = false, ducked = false, scene = true, mvol = 0, fader = null;
     var on = (function () { try { return JSON.parse(localStorage.getItem("tour.sound")) !== false; } catch (e) { return true; } })();
+    var mus = (function () { try { return JSON.parse(localStorage.getItem("tour.music")) !== false; } catch (e) { return true; } })();
     var MUSIC_VOL = 0.16;
     function buf(sec, brown) { var b = ctx.createBuffer(1, ctx.sampleRate * sec, ctx.sampleRate), d = b.getChannelData(0), last = 0;
       for (var i = 0; i < d.length; i++) { var w = Math.random() * 2 - 1; if (brown) { last = (last + 0.02 * w) / 1.02; d[i] = last * 3.5; } else d[i] = w; } return b; }
@@ -112,17 +113,32 @@
       // museum gala: a soft crowd through the walls and crickets from the Nile garden
       gala: function () { var m = loop(buf(4, true), "bandpass", 380, 0.9, 0.035); lfo(m.g.gain, 0.05, 0.015); crickets(); }
     };
-    function apply() { if (master) master.gain.setTargetAtTime(on ? (ducked ? 0.3 : 1) : 0, ctx.currentTime, 0.25); /* room sound steps back while someone speaks */ if (music) music.volume = on ? (ducked ? MUSIC_VOL * 0.35 : MUSIC_VOL) : 0; }
+    // Music only in the story moments (title, comics, confrontation, end screen), never while investigating,
+    // and almost silent while someone speaks. It fades, and pauses at 0 so it carries on where it stopped.
+    function musicTarget() { return on && mus && scene ? (ducked ? MUSIC_VOL * 0.1 : MUSIC_VOL) : 0; }
+    function fadeMusic() {
+      if (!music) return; clearInterval(fader);
+      var goal = musicTarget(); if (goal > 0 && music.paused) music.play().catch(function () {});
+      fader = setInterval(function () {
+        mvol += Math.max(-0.012, Math.min(0.006, goal - mvol)); if (Math.abs(goal - mvol) < 0.004) mvol = goal;
+        try { music.volume = Math.max(0, Math.min(1, mvol)); } catch (e) {}
+        if (mvol === goal) { clearInterval(fader); if (goal === 0) music.pause(); }
+      }, 50);
+    }
+    function apply() { if (master) master.gain.setTargetAtTime(on ? (ducked ? 0.3 : 1) : 0, ctx.currentTime, 0.25); /* room sound steps back while someone speaks */ fadeMusic(); }
     return {
       start: function () {
         if (started) return; started = true;
         try { ctx = new (window.AudioContext || window.webkitAudioContext)(); master = ctx.createGain(); master.connect(ctx.destination); (BEDS[C.ambience] || BEDS.room)(); } catch (e) { ctx = null; }
-        try { music = new Audio("audio/music.m4a"); music.loop = true; music.addEventListener("error", function () { music = null; }); music.play().catch(function () {}); } catch (e) { music = null; }
+        try { music = new Audio("audio/music.m4a"); music.loop = true; music.volume = 0; music.addEventListener("error", function () { music = null; }); } catch (e) { music = null; }
         apply();
       },
       on: function () { return on; },
       toggle: function () { on = !on; try { localStorage.setItem("tour.sound", JSON.stringify(on)); } catch (e) {} apply(); return on; },
-      duck: function (d) { ducked = d; apply(); }
+      duck: function (d) { ducked = d; apply(); },
+      scene: function (v) { v = !!v; if (v === scene) return; scene = v; if (started) fadeMusic(); },
+      musicOn: function () { return mus; },
+      toggleMusic: function () { mus = !mus; try { localStorage.setItem("tour.music", JSON.stringify(mus)); } catch (e) {} fadeMusic(); return mus; }
     };
   })();
   ["pointerdown", "keydown"].forEach(function (ev) { window.addEventListener(ev, function () { BG.start(); }, { once: true }); });
@@ -177,7 +193,7 @@
 
   // ---------- motion-comic player ----------
   function comic(panels, onDone) {
-    stop();
+    stop(); BG.scene(true);
     var ov = document.createElement("div"); ov.className = "comic";
     ov.innerHTML = '<div class="stage"></div><div class="cprog"></div><button class="skip">Skip ›</button>' +
       '<div class="rotate"><span class="ri">📱↻</span> Turn your phone sideways for the full picture</div>';
@@ -208,14 +224,14 @@
         timer = setTimeout(next, base + 6000);
       } else timer = setTimeout(next, base);
     }
-    function finish() { if (ended) return; ended = true; clearTimeout(timer); stop(); if (turned) landscape(false); ov.classList.add("bye"); setTimeout(function () { ov.remove(); if (onDone) onDone(); }, 500); }
+    function finish() { if (ended) return; ended = true; clearTimeout(timer); stop(); if (turned) landscape(false); ov.classList.add("bye"); setTimeout(function () { ov.remove(); if (onDone) onDone(); BG.scene(view.screen !== "hub" || !!document.querySelector(".confront, .comic")); }, 500); }
     stage.addEventListener("click", next);
     ov.querySelector(".skip").addEventListener("click", function () { track("comic_skip", { at: i + 1, of: panels.length }); finish(); });
     next();
   }
 
   // ---------- screens ----------
-  function render() { closeModal(); if (view.screen === "title") return title(); if (view.screen === "end") return end(); hub(); }
+  function render() { closeModal(); BG.scene(view.screen !== "hub"); if (view.screen === "title") return title(); if (view.screen === "end") return end(); hub(); }
 
   function title() {
     h('<div class="title"><img class="hero" src="img/co_1.jpg" alt=""><a class="btn ghost small maplink" href="../index.html" style="position:absolute;left:14px;top:14px;z-index:2">‹ Map</a><div class="tcard"><p class="kicker">' + esc(C.city) + ' · 1926 · <span class="diff ' + (C.level || "easy") + '">' + (C.level === "medium" ? "Medium" : C.level === "hard" ? "Hard" : "Easy") + '</span></p><h1>' + esc(C.title) + '</h1><p class="tag">' + esc(C.tagline) + '</p><button class="btn big" id="go">Open the case</button><p class="muted small">Bonus goals: ' + GOALS.map(function (g) { return g.icon + " " + esc(g.text); }).join(" · ") + '</p><p class="muted small">Sound on. About ' + (C.mins || 10) + ' minutes.' + (C.tutorial ? " Your first case comes with a guide." : "") + '</p></div></div>');
@@ -230,11 +246,12 @@
   function hub() {
     var tabs = [["suspects", "Suspects", "👥"], ["scene", "Crime scene", "🔦"], ["notebook", "Notebook", "📓"], ["accuse", "Accuse", "⚖️"]];
     var body = view.who ? profile(view.who) : { suspects: suspectsTab, scene: sceneTab, notebook: notebookTab, accuse: accuseTab }[view.tab]();
-    h('<div class="topbar"><a class="btn ghost small maplink" href="../index.html">‹ Map</a><h2>' + esc(C.title) + '</h2><button class="btn ghost small" id="snd" aria-label="Sound on or off">' + (BG.on() ? "🔊" : "🔇") + '</button> <button class="btn ghost small" id="hint">Hint</button></div>' +
+    h('<div class="topbar"><a class="btn ghost small maplink" href="../index.html">‹ Map</a><h2>' + esc(C.title) + '</h2><button class="btn ghost small" id="snd" aria-label="Sound on or off">' + (BG.on() ? "🔊" : "🔇") + '</button> <button class="btn ghost small' + (BG.musicOn() ? "" : " off") + '" id="mus" aria-label="Music on or off" title="Music">🎵</button> <button class="btn ghost small" id="hint">Hint</button></div>' +
       '<nav class="tabs">' + tabs.map(function (t) { return '<button data-tab="' + t[0] + '" class="' + (view.tab === t[0] && !view.who ? "on" : "") + '"><span class="ti">' + t[2] + "</span>" + t[1] + (t[0] === "notebook" && S.contra ? " ✓" : "") + "</button>"; }).join("") + "</nav>" + body.html);
     on("[data-tab]", function () { view.tab = this.getAttribute("data-tab"); view.who = null; sel = []; stop(); render(); });
     on("#hint", hint);
     on("#snd", function () { this.textContent = BG.toggle() ? "🔊" : "🔇"; });
+    on("#mus", function () { this.classList.toggle("off", !BG.toggleMusic()); toast(BG.musicOn() ? "Music on. It plays in the story scenes." : "Music off. Room sounds and voices stay on."); });
     if (body.wire) body.wire();
   }
 
@@ -371,7 +388,7 @@
     var F = C.finale, good = breakers(id), step = 0;
     var offered = []; C.suspects.forEach(function (s) { if (s.id !== id) ["where", "see"].forEach(function (k) { var key = s.id + ":" + k; if (heard(s.id, k) || good.indexOf(key) >= 0 && S.contra) offered.push(key); }); });
     var ev = C.clues.filter(function (c) { return !c.collector && S.found.indexOf(c.id) >= 0; });
-    stop();
+    stop(); BG.scene(true); // the confrontation is a story moment: music back in
     var ov = document.createElement("div"); ov.className = "confront"; document.body.appendChild(ov);
     ov.innerHTML = '<div class="cf-stage"><div class="cf-spot"></div><div class="cf-facebox"><img class="cf-face" src="' + img("face_" + id) + '" alt=""><i class="drop d1"></i><i class="drop d2"></i></div>' +
       '<div class="cf-bubble"><b>' + esc(short(id)) + '</b>“<span class="cf-line"></span>”</div><div class="cf-bang"></div></div><div class="cf-ask"></div>';
