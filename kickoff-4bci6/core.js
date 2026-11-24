@@ -23,7 +23,8 @@ const BOT = URLP.has('bot');                              // test robot: picks o
 const FAST = +URLP.get('fast') || 1;
 // ?audit=1: an automatic referee for soak tests. It checks every goal and every out-of-play against the ball's real path
 // and a few invariants (no NaN, ball near the pitch, time moving, no scene stuck). Results in window.AUDIT.
-const AUD = URLP.has('audit') ? (window.AUDIT = { goals: [], outs: [], bad: [], shots: 0 }) : null;
+const AUD = URLP.has('audit') ? (window.AUDIT = { goals: [], outs: [], bad: [], shots: 0, n: {} }) : null;
+const audN = k => { if (AUD) AUD.n[k] = (AUD.n[k] || 0) + 1; };   // event counters, so a clean soak also shows the paths really ran
 function audBad(kind, data) { if (AUD && AUD.bad.length < 200) AUD.bad.push({ kind, t: G ? Math.round(G.t * 10) / 10 : 0, m: G ? G.m : 0, score: G ? G.score.join('-') : '', ...data }); }                       // test speed-up of the pitch simulation only
 const rnd = (a = 1, b) => b === undefined ? Math.random() * a : a + Math.random() * (b - a);
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v));

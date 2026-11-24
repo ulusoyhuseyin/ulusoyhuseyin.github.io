@@ -23,7 +23,7 @@ const RING_BONUS = { perfect: .15, good: .07, miss: 0 };
 // ---------------------------------------------------------------- building the scene
 function openScene(kind, cx) {
   if (!G || G.paused || G.over) return;
-  G.paused = true; steer = null; touch = null;
+  G.paused = true; steer = null; touch = null; G.want = null; for (const q of G.P) q.wind = null;
   G.focus = { x: (cx.me.x + cx.them.x) / 2, y: (cx.me.y + cx.them.y) / 2 };
   const me = cx.me, them = cx.them, opts = [], cost = specCost(), sp = G.sp;
   const hero = me === G.hero, mo = G.mo, gk = keeperOf(1);
@@ -57,11 +57,11 @@ function openScene(kind, cx) {
     } else {
       if (kind === 'freekick') {
         add({ key: 'curl', name: 'CURL IT', sub: 'over the wall', ch: shotChance(me, them, false) + .04, kind: 'shot' });
-        add({ key: 'shortmo', name: 'SHORT TO MO', sub: 'Mo shoots from close', ch: chance(mo.st.pass + 2, them.st.catch), kind: 'duel' });
+        add({ key: 'shortmo', name: 'SHORT TO MO', sub: 'then you pick Mo\'s shot', ch: clamp(AI.passSuccess(me, mo.x, mo.y, false), .3, .92), kind: 'duel', mate: mo });
       } else {
         add({ key: 'shoot', name: 'SHOOT', sub: `from ${Math.round(distToGoal(me))} m`, ch: shotChance(me, them, false), kind: 'shot' });
         const mate = hero ? mo : G.hero;
-        if (mate.stun <= 0 && dist(mate, me) < 22) add({ key: 'square', name: `SQUARE → ${mate === mo ? 'MO' : save.name}`, sub: 'pass across for a tap-in', ch: chance(me.st.pass + 1, them.st.catch) - .04, kind: 'shot', mate });
+        if (mate.stun <= 0 && dist(mate, me) < 22 && distToGoal(mate) < 24) add({ key: 'square', name: `PASS → ${mate === mo ? 'MO' : save.name}`, sub: `then you pick ${mate === mo ? 'his' : 'your'} shot`, ch: clamp(AI.passSuccess(me, mate.x, mate.y, false), .2, .92), kind: 'duel', mate });
       }
       if (hero) add({ key: 'comet', name: 'COMET DRIVE!', sub: `special shot · ${cost} spirit`, ch: shotChance(me, them, true), kind: 'shot', special: 'comet', cost, cls: 'sp' + (sp >= cost ? ' pulse' : '') });
       hint = them.name === 'Holt' ? 'Holt is a big keeper. Specials beat keepers.' : cx.final ? 'The last kick of the match.' : '';
@@ -113,7 +113,7 @@ function showScene(kind, cx, title, sub, hint, opts) {
 // ---------------------------------------------------------------- choosing → clash → consequence
 async function choose(kind, cx, o) {
   $('scene').classList.remove('on');
-  const st = G.stat, me = cx.me, them = cx.them;
+  const st = G.stat, me = cx.me, them = cx.them; audN('opt_' + o.key);
   st.dec++; st.kinds[kind] = (st.kinds[kind] || 0) + 1; st.gaps.push(Math.round(G.since * 10) / 10); st.think = (st.think || 0) + (performance.now() - G.sceneOpen) / 1000;
   if (o.cost) G.sp -= o.cost;
   const actor = o.def || me; if (o.en) actor.en = Math.max(0, actor.en - o.en); if (o.key === 'hold') me.en = Math.min(100, me.en + 10);
@@ -152,7 +152,7 @@ async function consequence(kind, cx, o, win) {
       if (win) {
         const foesBeaten = o.key === 'dribble2' ? [them, cx.them2] : [them];
         foesBeaten.forEach(f => { f.stun = 1.8; burst(f.x, f.y, 12, '#fff', 5); });
-        me.ghost = 1; me.x += dir * 1.6; me.y -= o.key === 'dribble2' ? 7 : 3; me.vx = dir * 6; me.vy = -12; G.chain = true;
+        me.ghost = 1; dash(me, dir * 3.5, o.key === 'dribble2' ? -15 : -9, .5); G.chain = true;
         pop(me.x, me.y - 2, o.key === 'dribble2' ? 'THROUGH BOTH!' : 'PAST HIM!', '#ffd23f');
         if (G.tut === 1) { G.tut = 2; G.sp = G.spMax; setHint('Run at goal! The keeper is next.'); }
       } else {
@@ -184,21 +184,18 @@ async function consequence(kind, cx, o, win) {
       if (G.tutJustEnded === undefined && save.match === 1 && !G.tut) { G.tutJustEnded = true; G.afterGoal = () => { later(1.5, () => toast('ren', 'REN', 'Not bad... for an amateur.', 3600)); later(6, () => setHint('Tip: tap ⏸ PLAN (or Space) any time to stop the clock and plan.', 5000)); }; G.afterShot = () => later(1.5, () => toast('ren', 'REN', 'Hmph. Is that all, amateur?', 3600)); }
       break;
     }
-    case 'square': case 'shortmo': {
-      const mate = o.mate || G.mo, out = win ? 'goal' : (Math.random() < .5 ? 'catch' : 'parry');
-      mate.x = clamp(GX + (me.x < GX ? 5 : -5), 6, W - 6); mate.y = Math.max(7, Math.min(me.y, 14)); mate.vx = mate.vy = 0;
-      pass(me, mate, true); G.afterPick = null;
-      await wait(450 / FAST);
-      if (!G) return;
-      own(mate); shoot(mate, aimFor(out), false, out); G.ball.shot.assist = true;
-      if (cx.final) G.len = Math.min(G.len, G.t + 3);
+    case 'square': case 'shortmo': {                          // a real pass: the mate receives it where he is, then the shot is your next decision
+      const mate = o.mate || G.mo;
+      if (win) { pass(me, mate, true); G.chain = true; G.finalPass = !!cx.final; }
+      else { passCut(me, mate); if (cx.final) G.len = Math.min(G.len, G.t + 4); }
       break;
     }
     case 'needle': {
       await playSpecial(o);
       if (!G) return;
-      if (win) { const mo = G.mo; mo.x = GX + rnd(-4, 4); mo.y = 15; own(mo); G.ctrl = mo; for (const f of foes(mo)) if (f.role !== 'GK') f.stun = 1.5;
-        G.since = 0; G.paused = false; setTimeout(() => G && openScene('shot', { me: mo, them: keeperOf(1) }), 350); }
+      if (win) { const mo = G.mo, tx = clamp(lerp(mo.x, GX, .5), 10, W - 10), ty = clamp(Math.min(mo.y - 8, 18), 16, 40);
+        for (const f of foes(mo)) if (f.role !== 'GK') f.stun = 2.4;
+        passPoint(me, tx, ty); G.ball.rolls = new Map(); mo.runTo = { x: tx, y: ty, until: G.t + 4 }; G.chain = true; pop(me.x, me.y - 2, 'NEEDLE PASS!', '#9dff7a'); }
       else { own(them); pop(them.x, them.y - 2, 'READ IT!', '#ff6b6b'); }
       break;
     }
@@ -207,7 +204,7 @@ async function consequence(kind, cx, o, win) {
       if (o.special) await playSpecial(o);
       if (!G) return;
       if (win) { own(actor); them.stun = 1.6; burst(them.x, them.y, o.special ? 30 : 14, o.special ? '#9fd3ff' : '#c9b58a', o.special ? 9 : 5); pop(actor.x, actor.y - 2, o.special ? 'IRON CLAMP!' : 'WON IT!', '#ffd23f'); G.stat.tackles = (G.stat.tackles || 0) + 1; }
-      else { actor.stun = 1.2; them.y += 2.5; them.ghost = .5; pop(them.x, them.y - 2, 'BEATEN', '#ff6b6b'); }
+      else { actor.stun = 1.2; dash(them, 0, 6, .45); them.ghost = .5; pop(them.x, them.y - 2, 'BEATEN', '#ff6b6b'); }
       break;
     }
     case 'block': {
@@ -215,11 +212,11 @@ async function consequence(kind, cx, o, win) {
       else { const out = mates(them).filter(q => q.role !== 'GK').sort((a, c) => c.y - a.y)[0]; pass(them, out); me.stun = .5; }
       break;
     }
-    case 'hold': { me.y += 3; G.chain = false; break; }
+    case 'hold': { dash(me, 0, 6, .45); G.chain = false; break; }
     case 'dive': case 'rush': {
       const out = win ? (o.key === 'rush' ? 'catch' : (Math.random() < .5 ? 'catch' : 'parry')) : 'goal';
       shoot(them, aimFor(out), false, out);
-      if (win && o.key === 'rush') G.afterShot = () => later(.4, () => { if (G.ball.owner === me) { const h = G.hero; h.y = Math.min(h.y, 46); pass(me, h, true); pop(me.x, me.y - 2, 'COUNTER!', '#ffd23f'); } });
+      if (win && o.key === 'rush') G.afterShot = () => later(.4, () => { if (G.ball.owner === me) { const h = G.hero; if (dist(me, h) > 24) passLong(me, h); else pass(me, h, true); pop(me.x, me.y - 2, 'COUNTER!', '#ffd23f'); } });
       if (cx.final) G.len = Math.min(G.len, G.t + 3);
       break;
     }

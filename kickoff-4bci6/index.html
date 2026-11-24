@@ -41,7 +41,10 @@
   #acts button { display: none; width: 84px; height: 56px; border-radius: 16px; border: 3px solid #000; font-family: Bangers, sans-serif; font-size: 19px; letter-spacing: 1px; color: #fff;
     background: #26415e; box-shadow: 0 3px 0 #000; line-height: 1; padding: 0; touch-action: none; }
   #acts button small { display: block; font-family: system-ui; font-size: 10.5px; letter-spacing: 0; opacity: .9; margin-top: 3px; font-weight: 600; }
-  #acts button.on { display: block; }
+  #acts button { display: block; visibility: hidden; }       /* fixed slots: a button never moves under the thumb when another one appears */
+  #acts button.on { visibility: visible; pointer-events: auto; }
+  #acts { pointer-events: none; }
+  #acts #bTackle { position: absolute; right: 0; bottom: 0; }   /* TACKLE (defending) shares SHOOT's slot (attacking) */
   #acts #bShoot { background: #b3102b; width: 92px; height: 64px; font-size: 23px; }
   #acts #bLong { background: #2a5d7a; }
   #acts #bTackle { background: #6b4a12; width: 92px; height: 64px; font-size: 22px; }

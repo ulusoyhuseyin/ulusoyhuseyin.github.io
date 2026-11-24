@@ -7,8 +7,8 @@
 
 const PLAN = { on: false, tactic: 'bal', info: null };
 function planOpen() {
-  if (!G || G.paused || G.over || G.goalAnim || CINE.on || G.ball.shot || G.tut) return;
-  PLAN.on = true; G.paused = true; G.plan = true; steer = null; touch = null; snd('tick');
+  if (!G || G.paused || G.cutting || G.goalKick || G.over || G.goalAnim || CINE.on || G.ball.shot || G.tut) return;
+  audN('plan'); PLAN.on = true; G.paused = true; G.plan = true; steer = null; touch = null; snd('tick');
   G.stat.plans = (G.stat.plans || 0) + 1;
   planBar();
 }
@@ -38,11 +38,11 @@ function planBar() {
     $('planhint').innerHTML = PLAN.spot ? `Pass into space: <b>${Math.round(PLAN.spot.p * 100)}%</b> · ${PLAN.spot.who ? PLAN.spot.who.name + ' runs for it' : ''}. Tap the spot again to play it.`
       : `Tap a teammate to pass, an empty spot to pass into space, or the goal to shoot. <b>★ Best: ${bestTxt}</b>`;
     if (info.shot !== null) btn('SHOOT', `${Math.round(info.shot * 100)}%`, () => { planClose(); shootNow(car); G.stat.free++; });
-    if (info.foe && dist(info.foe, car) < 8 && G.since > 1) btn('TAKE HIM ON', `vs ${info.foe.name}`, () => { planClose(); info.foe.x = car.x + rnd(-1, 1); info.foe.y = car.y - 2.2; openScene('attack', { me: car, them: info.foe }); });
+    if (info.foe && dist(info.foe, car) < 8 && G.since > 1) btn('TAKE HIM ON', `run at ${info.foe.name}`, () => { planClose(); G.want = { kind: 'attack', me: car, them: info.foe, until: G.t + 4 }; });
     if (car === G.hero && G.sp >= specCost() && angleOk(car) && distToGoal(car) < 30) btn('COMET DRIVE!', `${specCost()} spirit`, () => { planClose(); openScene('shot', { me: car, them: keeperOf(1) }); }, 'sp');
   } else if (info.mode === 'defend') {
     $('planhint').innerHTML = `Tap a teammate to control him. ${info.car.name} has the ball.`;
-    if (info.tackle !== null) btn('STOP HIM', `${c.name} · ${Math.round(info.tackle * 100)}%`, () => { planClose(); c.x = info.car.x + rnd(-1, 1); c.y = info.car.y + 2; openScene('defend', { me: c, them: info.car }); });
+    if (info.tackle !== null) btn('STOP HIM', `${c.name} · ${Math.round(info.tackle * 100)}%`, () => { planClose(); G.want = { kind: 'defend', me: c, them: info.car, until: G.t + 4 }; G.ctrlLock = G.t + 4; });
     btn('PRESS!', 'two teammates hunt the ball', () => { G.pressT = G.t + 7; planClose(); pop(c.x, c.y - 2, 'PRESS!', '#ffd23f'); });
   } else $('planhint').textContent = 'The ball is loose. Tap a teammate to control him.';
   bar.querySelectorAll('[data-t]').forEach(b => b.classList.toggle('sel', b.dataset.t === PLAN.tactic));
@@ -53,8 +53,8 @@ function planTap(sx, sy) {
   const ours = G.P.filter(q => q.team === 0 && q.role !== 'GK' && q.stun <= 0).sort((a, b) => dist(a, w) - dist(b, w))[0];
   if (info.mode === 'attack') {
     const car = info.car;
-    if (info.shot !== null && w.y < 7 && Math.abs(w.x - GX) < 9) { planClose(); shootNow(car); G.stat.free++; return; }
     if (ours && ours !== car && dist(ours, w) < 3) { PLAN.spot = null; planClose(); if (dist(ours, car) > 24) passLong(car, ours); else { pass(car, ours); car.en = Math.max(0, car.en - 2); } return; }
+    if (info.shot !== null && w.y < 4 && Math.abs(w.x - GX) < 8) { planClose(); shootNow(car); G.stat.free++; return; }   // the goal itself
     if (w.x > 0 && w.x < W && w.y > 0 && w.y < H) {              // an empty spot: first tap shows the chance, second tap plays it
       if (PLAN.spot && Math.hypot(PLAN.spot.x - w.x, PLAN.spot.y - w.y) < 3) { const sp = PLAN.spot; PLAN.spot = null; planClose(); passSpace(car, sp.x, sp.y); G.stat.free++; return; }
       PLAN.spot = spaceChance(car, w.x, w.y); snd('tick'); planBar(); return;
@@ -126,3 +126,19 @@ addEventListener('keydown', e => {
 });
 addEventListener('keyup', e => { if (HELD.delete(e.code)) keySteer(); });
 addEventListener('blur', () => { HELD.clear(); keySteer(); });
+
+// test robot (?bot=1): it also uses the free-play buttons and PLAN now and then, so the soak test covers those paths too
+let botT = 0;
+function botFree(dt) {
+  if (!BOT || !G || G.paused || G.over || CINE.on || (botT -= dt) > 0) return;
+  botT = rnd(1.5, 3.5);
+  const p = G.ctrl, b = G.ball, r = Math.random(), on = id => $(id).classList.contains('on');
+  if (b.owner === p && p.team === 0) {
+    if (r < .1) { planOpen(); setTimeout(() => { if (!PLAN.on) return; const bs = [...$('planacts').querySelectorAll('button')];
+      if (bs.length && Math.random() < .5) return pick(bs).click();
+      const q = pick(G.P.filter(x => x.team === 0 && x.role !== 'GK' && x !== p)), [sx, sy] = W2S(q.x, q.y); planTap(sx, sy); if (PLAN.on) planClose(); }, 300); }
+    else if (r < .4 && on('bPass')) $('bPass').click();
+    else if (r < .5 && on('bShoot')) $('bShoot').click();
+    else if (r < .55 && on('bLong')) $('bLong').click();
+  } else if (r < .4 && on('bTackle')) $('bTackle').click();
+}
