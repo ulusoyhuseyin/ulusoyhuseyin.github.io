@@ -87,13 +87,16 @@ function cineBg(c, focus, extra) {
   c.fillStyle = extra || 'rgba(30,0,10,.3)'; c.fillRect(-60, -60, CW + 120, CH + 120);
 }
 async function techD(name, dur, skippable) {
-  const trail = [];
+  const st = { trail: [], boomed: false };
   snd('swoosh');
-  let boomed = false;
-  await cine(dur, (c, t, ts) => {
+  await cine(dur, (c, t, ts) => dPhase(c, t, ts, st, name, skippable), skippable);
+}
+function dPhase(c, t, ts, st, name, skippable) {             // one frame of the action part of technique D at phase t (0..1)
+  const trail = st.trail;
+  {
     const portrait = CH > CW, h = portrait ? Math.min(CH * .5, CW * 1.25) : CH * .78;
     const T1 = .2, T2 = .42, TI = .47, T3 = .78;                // sprint | leap | impact frames | strike hold | landing
-    if (t > T2 && !boomed) { boomed = true; snd('boom'); buzz(60); }
+    if (t > T2 && !st.boomed) { st.boomed = true; snd('boom'); buzz(60); }
     const shake = t > T2 && t < T2 + .12 ? (1 - (t - T2) / .12) * 16 : 0;
     const camZ = t < T2 ? 1 + .18 * t / T2 : t < T3 ? 1.12 + .06 * (t - TI) : 1.05;
     c.save(); c.translate(CW / 2 + rnd(-shake, shake), CH / 2 + rnd(-shake, shake)); c.scale(camZ, camZ); c.translate(-CW / 2, -CH / 2);
@@ -140,7 +143,7 @@ async function techD(name, dur, skippable) {
     if (t > TI) moveName(c, name + '!', (t - TI) / (1 - TI), CW / 2, CH * (portrait ? .13 : .14), Math.min(CW * .14, CH * .12, 84));
     if (t > .97) { c.fillStyle = `rgba(255,255,255,${(t - .97) * 33})`; c.fillRect(0, 0, CW, CH); }
     if (skippable && t < .9) { c.font = '13px system-ui'; c.fillStyle = 'rgba(255,255,255,.6)'; c.textAlign = 'right'; c.fillText('tap to skip', CW - 12, CH - 16); }
-  }, skippable);
+  }
 }
 
 // ---------------------------------------------------------------- placeholder cut-in for moves without key poses yet
@@ -170,5 +173,53 @@ async function techFX(name, face, cols, dur, skippable) {
     c.restore();
     if (t > .3) moveName(c, name + '!', (t - .3) / .7, CW / 2, py - Math.min(CW * .09, 50), Math.min(CW * .13, CH * .11, 80), [cols[0], cols[1], cols[2]]);
     if (t > .94) { c.fillStyle = `rgba(255,255,255,${(t - .94) * 16})`; c.fillRect(0, 0, CW, CH); }
+  }, skippable);
+}
+
+// ---------------------------------------------------------------- the long Comet Drive: technique D with face close-ups cut in
+// side profile → sprint → burning eyes → leap → kick (impact frames) → battle cry with the name → landing. About 4.6 s.
+for (const k of ['side', 'eyes', 'shout']) load('fs_' + k, `img/fs_${k}.jpg`);
+function faceShot(c, key, k, ts, name) {
+  const img = IMG['fs_' + key], portrait = CH > CW;
+  c.fillStyle = '#000'; c.fillRect(0, 0, CW, CH);
+  if (key === 'side') {                                      // calm before the storm: letterboxed, slow push-in, slides in from the right
+    const bh = portrait ? CH * .62 : CH * .8, y = (CH - bh) / 2, off = (1 - easeOut(Math.min(1, k / .2))) * CW * .4;
+    c.save(); c.beginPath(); c.rect(0, y, CW, bh); c.clip();
+    drawArtIn(c, img, off, y, CW, bh, [.58, .45], 1.02 + k * .12, false); c.restore();
+    speedLines(c, 0, y, CW, bh, 18, 'rgba(255,255,255,.5)', ts * .4, 1);
+  } else if (key === 'eyes') {                               // the eyes burn: a white flash, a strip across the screen, glowing pupils
+    const bh = portrait ? CH * .34 : CH * .6, y = (CH - bh) / 2, sh = k < .25 ? (1 - k / .25) * 10 : 0;
+    focusLines(c, CW / 2, CH / 2, 70, Math.max(CW, CH) * .3, '#fff', .5);
+    c.save(); c.translate(rnd(-sh, sh), rnd(-sh, sh)); c.beginPath(); c.rect(-10, y, CW + 20, bh); c.clip();
+    const r = drawArtIn(c, img, -10, y, CW + 20, bh, [.5, .55], 1.05 + k * .2, false);
+    c.globalCompositeOperation = 'lighter';
+    for (const ex of [.37, .65]) { const gx = r.ix + ex * r.iw, gy = r.iy + .55 * r.ih, g = c.createRadialGradient(gx, gy, 0, gx, gy, r.iw * .09 * (1 + .3 * Math.sin(ts * 30)));
+      g.addColorStop(0, 'rgba(255,200,80,.9)'); g.addColorStop(1, 'rgba(255,60,0,0)'); c.fillStyle = g; c.beginPath(); c.arc(gx, gy, r.iw * .1, 0, 7); c.fill(); }
+    c.globalCompositeOperation = 'source-over'; c.restore();
+    c.lineWidth = 4; c.strokeStyle = '#fff'; c.strokeRect(-10, y, CW + 20, bh);
+    if (k < .12) { c.fillStyle = `rgba(255,255,255,${1 - k / .12})`; c.fillRect(0, 0, CW, CH); }
+  } else {                                                    // the battle cry: full screen, zoom punch, heavy shake, the name
+    const sh = k < .3 ? (1 - k / .3) * 22 : 3;
+    c.save(); c.translate(rnd(-sh, sh), rnd(-sh, sh));
+    drawArtIn(c, img, -30, -30, CW + 60, CH + 60, [.5, .5], 1.3 - .22 * easeOut(Math.min(1, k / .3)), false);
+    c.restore();
+    c.globalCompositeOperation = 'lighter'; focusLines(c, CW / 2, CH * .55, 40, Math.min(CW, CH) * .45, '#ffb000', .35); c.globalCompositeOperation = 'source-over';
+    moveName(c, name + '!', k, CW / 2, CH * (portrait ? .82 : .78), Math.min(CW * .16, CH * .14, 96));
+    if (k < .08) { c.fillStyle = `rgba(255,150,0,${1 - k / .08})`; c.fillRect(0, 0, CW, CH); }
+  }
+}
+async function techDFull(name, skippable) {
+  const st = { trail: [], boomed: false };
+  const SEG = [['f', 'side', .8], ['d', 0, .2, .55], ['f', 'eyes', .6], ['d', .2, .42, .5], ['d', .42, .78, .95], ['f', 'shout', .7], ['d', .78, 1, .5]];
+  const total = SEG.reduce((a, s) => a + s[s.length - 1], 0);
+  snd('swoosh'); let lastSeg = -1;
+  await cine(total, (c, t, ts) => {
+    let at = t * total, i = 0;
+    while (i < SEG.length - 1 && at > SEG[i][SEG[i].length - 1]) { at -= SEG[i][SEG[i].length - 1]; i++; }
+    const s = SEG[i], dur = s[s.length - 1], k = clamp(at / dur, 0, 1);
+    if (i !== lastSeg) { lastSeg = i; if (s[0] === 'f') { snd(s[1] === 'shout' ? 'boom' : 'swoosh'); if (s[1] === 'shout') buzz(80); } }
+    if (s[0] === 'f') faceShot(c, s[1], k, ts, name);
+    else dPhase(c, lerp(s[1], s[2], k), ts, st, name, skippable);
+    if (skippable && t < .9) { c.font = '13px system-ui'; c.fillStyle = 'rgba(255,255,255,.6)'; c.textAlign = 'right'; c.fillText('tap to skip', CW - 12, CH - 16); }
   }, skippable);
 }

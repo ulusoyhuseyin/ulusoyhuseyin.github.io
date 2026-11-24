@@ -6,12 +6,14 @@
 const chance = (a, b, k = .035) => clamp(.5 + (a - b) * k, .08, .92);
 function shotChance(p, gk, special) {
   const d = distToGoal(p);
-  let c = chance(p.st.shoot, gk.st.catch + 3) - Math.max(0, d - 11) * .018 + (save.style === 'striker' && p === G.hero ? .05 : 0);
+  let c = chance(p.st.shoot, gk.st.catch + 2.5) - Math.max(0, d - 13) * .018 + (save.style === 'striker' && p === G.hero ? .05 : 0);
   if (special) c += .3;
   return clamp(c, .08, special ? .9 : .8);
 }
-function bonuses(o) {                                        // visible boosts: ZONE and "fighting spirit" after two lost clashes in a row
+const EN = { dribble: 14, dribble2: 20, onetwo: 6, tokai: 4, back: 0, longshot: 6, comet: 18, needle: 10, shoot: 6, curl: 6, square: 4, shortmo: 4, tackle: 12, clamp: 16, block: 7, hold: 0, dive: 0, rush: 0, slide: 10 };
+function bonuses(o, actor) {                                 // visible boosts and penalties: ZONE, "fighting spirit" after two lost clashes in a row, TIRED
   let add = 0; const tags = [];
+  const tp = actor ? tiredPen(actor) : 0; if (tp > .005) { add -= tp; tags.push(`TIRED −${Math.round(tp * 100)}`); }
   if (G.zone > 0) { add += .1; tags.push('ZONE +10'); }
   if (G.lossRun >= 2) { add += .05; tags.push('SPIRIT +5'); }
   o.ch = clamp(o.ch + add, .05, o.special ? .95 : .92); o.tags = tags; return o;
@@ -26,10 +28,10 @@ function openScene(kind, cx) {
   const me = cx.me, them = cx.them, opts = [], cost = specCost(), sp = G.sp;
   const hero = me === G.hero, mo = G.mo, gk = keeperOf(1);
   let title = '', sub = '', hint = '';
-  const add = o => opts.push(o.noRoll || o.tut ? o : bonuses(o));
+  const add = o => { o.en = EN[o.key] || 0; opts.push(o.noRoll || o.tut ? o : bonuses(o, o.def || me)); };
   if (kind === 'attack' || kind === 'squeeze') {
     const hard = kind === 'squeeze' ? Math.max(them.st.tackle, cx.them2.st.tackle) : them.st.tackle;
-    title = kind === 'squeeze' ? 'TWO DEFENDERS!' : `${them.name.toUpperCase()} CLOSES IN!`; sub = 'your move';
+    title = kind === 'squeeze' ? 'TWO DEFENDERS!' : `${them.name.toUpperCase()} CLOSES IN!`; sub = `${me.name} DRI ${Math.round(me.st.dribble)} vs TKL ${Math.round(them.st.tackle)}`;
     if (G.tut === 1) {
       add({ key: 'dribble', name: 'DRIBBLE', sub: `past ${them.name} · tutorial`, ch: 1, kind: 'duel', tut: true });
       hint = 'Pick a move. The big number is your chance to win it.';
@@ -65,7 +67,7 @@ function openScene(kind, cx) {
       hint = them.name === 'Holt' ? 'Holt is a big keeper. Specials beat keepers.' : cx.final ? 'The last kick of the match.' : '';
     }
   } else if (kind === 'defend') {
-    title = `STOP ${them.name.toUpperCase()}!`; sub = `${me.name} vs ${them.name}`;
+    title = `STOP ${them.name.toUpperCase()}!`; sub = `${me.name} TKL ${Math.round(me.st.tackle)} vs DRI ${Math.round(them.st.dribble)}`;
     add({ key: 'tackle', name: 'TACKLE', sub: 'win the ball · big gain', ch: chance(me.st.tackle, them.st.dribble), kind: 'duel', big: true });
     add({ key: 'block', name: 'BLOCK', sub: 'safer · knocks it loose', ch: chance(me.st.tackle + 4, them.st.dribble), kind: 'duel' });
     add({ key: 'hold', name: 'HOLD', sub: 'stay goal-side · no risk now', noRoll: true, cls: 'safe' });
@@ -88,19 +90,21 @@ function faceDiv(el, p) {
   el.style.borderColor = p.team === 0 ? '#e23b3b' : (p.face ? '#8fd8ff' : '#ccd');
 }
 function showScene(kind, cx, title, sub, hint, opts) {
-  $('st').innerHTML = `${title}<small>${sub}</small>`; $('shint').textContent = hint || '';
+  const me = cx.me, en = me.role === 'GK' ? '' : ` · ⚡${Math.round(me.en)}${me.en < 40 ? ' TIRED' : ''}`;
+  $('st').innerHTML = `${title}<small>${sub}${en}</small>`; $('shint').textContent = hint || '';
   faceDiv($('fl'), cx.me); faceDiv($('fr'), cx.them);
   const box = $('scene'), row = $('opts'); row.innerHTML = '';
   for (const o of opts) {
     const b = document.createElement('button'); b.className = o.cls || ''; b.disabled = !!o.disabled;
     const pc = o.noRoll ? '' : Math.round(o.ch * 100) + '%', col = o.ch >= .65 ? '#7dff9a' : o.ch >= .45 ? '#ffd23f' : '#ff8a7a';
     b.innerHTML = `<span class="n">${o.name}</span>${o.noRoll ? '<span class="p" style="color:#9fe">SAFE</span>' : `<span class="p" style="color:${col}">${pc}</span>`}` +
-      `<small>${o.sub}${(o.tags || []).map(t => `<span class="tag">${t}</span>`).join('')}${o.disabled ? ` · need ${o.cost}` : ''}</small>` +
+      `<small>${o.sub}${o.en ? ` · <b style="color:#9dffb0">⚡−${o.en}</b>` : o.key === 'hold' ? ' · <b style="color:#9dffb0">⚡+10</b>' : ''}${(o.tags || []).map(t => `<span class="tag">${t}</span>`).join('')}${o.disabled ? ` · need ${o.cost}` : ''}</small>` +
       (o.noRoll ? '' : `<i class="bar" style="width:${o.ch * 100}%;color:${col}"></i>`);
     b.onclick = () => { if (box.dataset.busy) return; box.dataset.busy = '1'; choose(kind, cx, o); };
     row.appendChild(b);
   }
   delete box.dataset.busy; box.classList.add('on');
+  $('pl').style.display = 'none'; document.querySelectorAll('#acts button').forEach(b => b.classList.remove('on'));
   G.sceneOpen = performance.now();
   if (BOT) setTimeout(() => { const ok = opts.filter(o => !o.disabled); const o = ok.find(x => x.special && Math.random() < .7) || pick(ok); if (G && G.paused && !box.dataset.busy) { box.dataset.busy = '1'; choose(kind, cx, o); } }, 300 / FAST);
 }
@@ -111,6 +115,7 @@ async function choose(kind, cx, o) {
   const st = G.stat, me = cx.me, them = cx.them;
   st.dec++; st.kinds[kind] = (st.kinds[kind] || 0) + 1; st.gaps.push(Math.round(G.since * 10) / 10); st.think = (st.think || 0) + (performance.now() - G.sceneOpen) / 1000;
   if (o.cost) G.sp -= o.cost;
+  const actor = o.def || me; if (o.en) actor.en = Math.max(0, actor.en - o.en); if (o.key === 'hold') me.en = Math.min(100, me.en + 10);
   let win = true, q = 'miss';
   if (!o.noRoll) {
     st.chances.push(Math.round(o.ch * 100));
@@ -133,7 +138,7 @@ async function playSpecial(o) {
   G.stat.specials++;
   const first = !save.seenCut; save.seenCut = (save.seenCut || 0) + 1; store();
   const short = !first && !BOT, dur = first ? 2.6 : 1.4;
-  if (o.special === 'comet') await techD('COMET DRIVE', dur, short);
+  if (o.special === 'comet') await techDFull('COMET DRIVE', !first && !BOT);   // long version with face shots (owner 24 Nov); shorten later
   else if (o.special === 'clamp') await techFX('IRON CLAMP', 'kai', ['#e8f8ff', '#5ab8ff', '#0e2c55'], first ? 1.8 : 1.2, short);
   else if (o.special === 'needle') await techFX('NEEDLE PASS', 'kai', ['#fffbd0', '#9dff7a', '#0f3d1f'], first ? 1.8 : 1.2, short);
 }

@@ -19,7 +19,7 @@ const botGo = (el, ms = 400) => { if (BOT && el) setTimeout(() => el.click(), ms
 function show(id) {
   for (const s of document.querySelectorAll('.screen')) s.classList.toggle('on', s.id === id);
   $('hud').style.display = id ? 'none' : 'flex';
-  if (id) { $('scene').classList.remove('on'); $('zone').classList.remove('on'); }
+  if (id) { $('scene').classList.remove('on'); $('zone').classList.remove('on'); $('pl').style.display = 'none'; document.querySelectorAll('#acts button').forEach(b => b.classList.remove('on')); }
 }
 
 // ---------------------------------------------------------------- title
@@ -57,7 +57,7 @@ function finish() {
   const xp = 50 + (res === 'w' ? 40 : res === 'd' ? 15 : 5) + st.goals * 20 + st.assists * 12 + st.won * 4 + st.perfect * 3;
   const real = Math.round((performance.now() - G.real0) / 1000);
   const inRange = st.chances.filter(c => c >= 45 && c <= 75).length;
-  const summary = { m, res, score: `${a}-${b}`, grade, dec: st.dec, won: st.won, perfect: st.perfect, good: st.good, upset: st.upset, specials: st.specials, goals: st.goals, assists: st.assists, real, think: Math.round(st.think || 0), oddsBand: st.chances.length ? Math.round(inRange / st.chances.length * 100) : 0, steered: !!G.touched };
+  const summary = { len: G.opp.len, free: st.free || 0, oppPasses: st.oppPasses || 0, m, res, score: `${a}-${b}`, grade, dec: st.dec, won: st.won, perfect: st.perfect, good: st.good, upset: st.upset, specials: st.specials, goals: st.goals, assists: st.assists, real, think: Math.round(st.think || 0), oddsBand: st.chances.length ? Math.round(inRange / st.chances.length * 100) : 0, steered: !!G.touched };
   window.LAST = { ...summary, chances: st.chances, gaps: st.gaps, kinds: st.kinds };
   track('m_end', summary);
   save.plays = (save.plays || 0) + 1; save.rec.push({ m, res, a, b, grade });
@@ -105,7 +105,7 @@ function pickStyle() {
   show('pick');
   p.querySelectorAll('[data-w]').forEach(b => b.onclick = async () => {
     fxc.style.zIndex = 20; const k = b.dataset.w;
-    if (k === 'striker') await techD('COMET DRIVE', 2.6, true);
+    if (k === 'striker') await techDFull('COMET DRIVE', true);
     else if (k === 'engine') await techFX('IRON CLAMP', 'kai', ['#e8f8ff', '#5ab8ff', '#0e2c55'], 1.8, true);
     else await techFX('NEEDLE PASS', 'kai', ['#fffbd0', '#9dff7a', '#0f3d1f'], 1.8, true);
     fxc.style.zIndex = '';
