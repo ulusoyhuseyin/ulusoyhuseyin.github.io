@@ -223,3 +223,60 @@ async function techDFull(name, skippable) {
     if (skippable && t < .9) { c.font = '13px system-ui'; c.fillStyle = 'rgba(255,255,255,.6)'; c.textAlign = 'right'; c.fillText('tap to skip', CW - 12, CH - 16); }
   }, skippable);
 }
+
+// ---------------------------------------------------------------- Ren's FROST SPIRAL (rival special, aimed at your goal): face shot → impact → kick + ice spiral
+const REN = { foot: [.02, .22] };
+{ const i = new Image(); i.onload = () => { i.ok = true; i.sil = silhouettes(i); }; i.src = 'img/ren_kick.png'; REN.img = i; }
+load('ren_fs', 'img/ren_fs.jpg');
+async function techRen(name, skippable) {
+  const SEG = [.8, .16, 1.25, .35], total = SEG.reduce((a, b) => a + b, 0), shards = [];
+  snd('swoosh'); let boomed = false;
+  await cine(total, (c, t, ts) => {
+    let at = t * total, i = 0; while (i < SEG.length - 1 && at > SEG[i]) { at -= SEG[i]; i++; }
+    const k = clamp(at / SEG[i], 0, 1), portrait = CH > CW;
+    c.fillStyle = '#02101c'; c.fillRect(0, 0, CW, CH);
+    const ice = ['#e8fbff', '#7fd8ff', '#1d6fa3'];
+    if (i === 0) {                                            // the cold stare
+      drawArtIn(c, IMG.ren_fs, -20, -20, CW + 40, CH + 40, [.5, .4], 1.05 + k * .12, false);
+      c.globalCompositeOperation = 'lighter';
+      for (let j = 0; j < 30; j++) { const x = (j * 97 + ts * 40 * (1 + j % 3)) % CW, y = (j * 131 + ts * 25) % CH; c.fillStyle = 'rgba(160,230,255,.5)'; c.beginPath(); c.arc(x, y, 1.5 + j % 3, 0, 7); c.fill(); }
+      c.globalCompositeOperation = 'source-over';
+      if (k < .1) { c.fillStyle = `rgba(200,240,255,${1 - k / .1})`; c.fillRect(0, 0, CW, CH); }
+      return;
+    }
+    const img = REN.img, h = portrait ? Math.min(CH * .5, CW * 1.15) : CH * .78, w = img.ok ? h * img.width / img.height : h * .78;
+    const cx = CW * (portrait ? .74 : .62), by = CH * (portrait ? .2 : .1) + h, x0 = cx - w / 2, y0 = by - h;
+    const foot = [x0 + REN.foot[0] * w, y0 + REN.foot[1] * h];
+    if (i === 1) {                                            // impact frames: white on black, then black on white
+      const inv = k > .5; c.fillStyle = inv ? '#fff' : '#000'; c.fillRect(0, 0, CW, CH);
+      if (img.ok) c.drawImage(img.sil[inv ? '#000' : '#fff'], x0, y0, w, h);
+      if (!boomed) { boomed = true; snd('boom'); buzz(70); }
+      return;
+    }
+    if (i === 2) {                                            // the kick, held; the ball spirals away to the left in ice
+      const sh = k < .12 ? (1 - k / .12) * 14 : 0;
+      c.save(); c.translate(rnd(-sh, sh), rnd(-sh, sh));
+      cineBg(c, [.5, .5], 'rgba(0,30,60,.55)');
+      speedLines(c, -60, 0, CW + 120, CH, 80, '#cdf3ff', ts * 2.2, 1);
+      if (img.ok) c.drawImage(img, x0, y0, w, h);
+      const kk = ease(clamp((k - .1) / .9, 0, 1)), bx = foot[0] - kk * CW * (portrait ? .75 : .9), byy = foot[1] + kk * CH * (portrait ? .5 : .4), br = h * .055;
+      c.globalCompositeOperation = 'lighter'; c.lineCap = 'round';
+      for (const [wk, col] of [[2.4, 'rgba(60,160,255,.35)'], [1.5, 'rgba(127,216,255,.6)'], [.7, 'rgba(235,252,255,.95)']]) {
+        c.strokeStyle = col; c.lineWidth = br * wk; c.beginPath();
+        for (let j = 0; j <= 30; j++) { const u = j / 30, px = lerp(foot[0], bx, u), py = lerp(foot[1], byy, u), sp = Math.sin(u * 12 - ts * 16) * br * 2.4 * Math.min(1, u * 2);
+          j ? c.lineTo(px, py + sp) : c.moveTo(px, py + sp); }
+        c.stroke();
+      }
+      if (shards.length < 60) shards.push({ x: bx, y: byy, vx: rnd(-2, 4), vy: rnd(-3, 3), l: 1 });
+      for (const s of shards) { s.x += s.vx; s.y += s.vy; s.l -= .02; c.fillStyle = `rgba(200,240,255,${Math.max(0, s.l)})`; c.save(); c.translate(s.x, s.y); c.rotate(s.x * .1); c.fillRect(-3, -1, 6, 2); c.restore(); }
+      c.globalCompositeOperation = 'source-over';
+      ballArt(c, bx, byy, br, k < .1 ? .62 : 1, -ts * 40);
+      if (k < .35) { c.strokeStyle = `rgba(200,240,255,${1 - k / .35})`; c.lineWidth = 6; c.beginPath(); c.arc(foot[0], foot[1], br + k * h, 0, 7); c.stroke(); }
+      c.restore();
+      moveName(c, name + '!', k, CW / 2, CH * (portrait ? .12 : .13), Math.min(CW * .13, CH * .12, 80), ice);
+      return;
+    }
+    c.fillStyle = `rgba(220,245,255,${1 - k})`; c.fillRect(0, 0, CW, CH);   // cold flash
+    moveName(c, name + '!', 1, CW / 2, CH * (portrait ? .12 : .13), Math.min(CW * .13, CH * .12, 80), ice);
+  }, skippable);
+}

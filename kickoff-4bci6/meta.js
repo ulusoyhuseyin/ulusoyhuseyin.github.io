@@ -19,13 +19,13 @@ const botGo = (el, ms = 400) => { if (BOT && el) setTimeout(() => el.click(), ms
 function show(id) {
   for (const s of document.querySelectorAll('.screen')) s.classList.toggle('on', s.id === id);
   $('hud').style.display = id ? 'none' : 'flex';
-  if (id) { $('scene').classList.remove('on'); $('zone').classList.remove('on'); $('pl').style.display = 'none'; document.querySelectorAll('#acts button').forEach(b => b.classList.remove('on')); }
+  if (id) { $('scene').classList.remove('on'); $('zone').classList.remove('on'); $('pl').style.display = 'none'; document.querySelectorAll('#acts button, #bPlan').forEach(b => b.classList.remove('on')); $('planbar').classList.remove('on'); PLAN.on = false; }
 }
 
 // ---------------------------------------------------------------- title
 function title() {
   G = null; show('title');
-  $('play').textContent = save.done ? 'REPLAY MATCH 2' : save.match > 1 ? `CONTINUE · MATCH ${save.match}` : 'KICK OFF';
+  $('play').textContent = save.done ? 'REPLAY MATCH 3' : save.match > 1 ? `CONTINUE · MATCH ${save.match}` : 'KICK OFF';
   $('tsub').textContent = save.style ? `${save.name} · LV ${save.lvl} · ${STYLES[save.style].name}` : 'Anime football. You make the calls.';
   const cb = $('consentBox');
   if (!LS.get('ss.consent')) {
@@ -36,7 +36,7 @@ function title() {
   const m = $('mute'); if (m) m.onclick = () => { MUTE = !MUTE; LS.set('ss.mute', MUTE ? '1' : '0'); title(); };
   botGo($('play'));
 }
-$('play').onclick = () => { if (save.done) save.match = 2; startMatch(); };
+$('play').onclick = () => { if (save.done) save.match = 3; startMatch(); };
 $('reset').onclick = () => { if (confirm('Start a new season? Your level and style will be reset.')) { save = fresh(); store(); title(); } };
 
 function startMatch() {
@@ -45,6 +45,7 @@ function startMatch() {
   if (G.tut) setHint('Drag anywhere to steer. Or just watch: the choices come to you.', 5000);
   else setHint(`Match ${G.m} vs ${G.opp.name}`, 3000);
   if (G.m === 2) setTimeout(() => G && toast('ito', 'COACH ITO', 'Bruno wins plain duels. Go around him!', 4200), 1600);
+  if (G.m === 3) setTimeout(() => G && toast('ren', 'REN', 'Show me that Comet Drive. I\'ll freeze it.', 4200), 1600);
 }
 
 // ---------------------------------------------------------------- result
@@ -78,7 +79,7 @@ function finish() {
     <p class="bang" style="font-size:26px">+<span id="xpn">0</span> XP${bonus ? ` <span style="font-size:16px;opacity:.8">(+ match bonus)</span>` : ''}</p>
     <div class="xp"><i id="xpb" style="width:${xp0 / need0 * 100}%"></i></div>
     <p id="lvl" class="small">LV ${lv0}</p>
-    <p class="small" style="max-width:360px">${res === 'l' ? 'A loss still makes you stronger. Try again, or keep going.' : next ? `Next: <b>${next.name}</b>. Their centre-back <b>Bruno</b> is called "the Wall".` : 'Next: <b>Storm Academy</b>. Ren is waiting.'}</p>
+    <p class="small" style="max-width:360px">${res === 'l' ? 'A loss still makes you stronger. Try again, or keep going. ' : ''}${m === 1 ? 'Next: <b>Iron Valley</b>. Their centre-back <b>Bruno</b> is called "the Wall".' : m === 2 ? 'Next: <b>Storm Academy</b>. <b>Ren</b> is waiting.' : 'Next: <b>Kings of Sand</b>, then the Final against <b>Sora</b>.'}</p>
     <div style="display:flex;gap:10px;flex-wrap:wrap;justify-content:center">${res === 'l' ? '<button class="btn alt" id="rematch">REMATCH</button>' : ''}<button class="btn" id="cont">CONTINUE</button></div>`;
   show('result');
   let n = 0; const tick = setInterval(() => { n = Math.min(xp, n + Math.ceil(xp / 25)); $('xpn').textContent = n; if (n >= xp) clearInterval(tick); }, 40);
@@ -87,7 +88,8 @@ function finish() {
     const bar = $('xpb'); bar.style.transition = 'none'; bar.style.width = '0'; requestAnimationFrame(() => { bar.style.transition = 'width .6s ease-out'; bar.style.width = '20%'; }); }, 1500);
   const advance = () => {
     if (m === 1) { save.match = 2; store(); if (!save.style) pickStyle(); else training(() => story(nextMatch)); }
-    else { save.done = true; store(); if (!save.fb) feedback(); else ending(); }
+    else if (m === 2) { save.match = 3; store(); const go = () => training(() => story(nextMatch)); if (!save.fb) feedback(go); else go(); }
+    else { save.done = true; save.lastRes = res; store(); ending(); }
   };
   $('cont').onclick = () => { $('cont').onclick = null; advance(); };
   if ($('rematch')) $('rematch').onclick = () => startMatch();
@@ -145,6 +147,7 @@ function ringTap(T, label) {                               // one timing ring on
     const t0 = performance.now(); let tapAt = null, q = null, qt = 0;
     const onTap = e => { if (tapAt === null) { tapAt = (performance.now() - t0) / 1000; e.preventDefault(); } };
     addEventListener('pointerdown', onTap, true);
+    const onKey = e => { if (['Space', 'Enter'].includes(e.code)) { e.stopPropagation(); onTap(e); } }; addEventListener('keydown', onKey, true);
     const botT = BOT ? rnd(.6, 1) * T : null;
     const f = now => {
       const t = (now - t0) / 1000; if (BOT && tapAt === null && t >= botT) tapAt = botT;
@@ -157,7 +160,7 @@ function ringTap(T, label) {                               // one timing ring on
       ballArt(c, cx, cy, R * .45, 1, t * 4);
       c.textAlign = 'center'; c.font = '26px Bangers, sans-serif'; c.lineWidth = 5; c.strokeStyle = '#000'; c.fillStyle = '#fff';
       c.strokeText(q ? (q === 'perfect' ? 'PERFECT!' : q === 'good' ? 'GOOD' : 'MISS') : label, cx, cy - R * 1.5); c.fillText(q ? (q === 'perfect' ? 'PERFECT!' : q === 'good' ? 'GOOD' : 'MISS') : label, cx, cy - R * 1.5);
-      if (q && t - qt > .55) { removeEventListener('pointerdown', onTap, true); c.clearRect(0, 0, CW, CH); setTimeout(() => res(q), 150); return; }
+      if (q && t - qt > .55) { removeEventListener('pointerdown', onTap, true); removeEventListener('keydown', onKey, true); c.clearRect(0, 0, CW, CH); setTimeout(() => res(q), 150); return; }
       requestAnimationFrame(f);
     };
     requestAnimationFrame(f);
@@ -170,6 +173,10 @@ const STORY = {
       ['ito', 'COACH ITO', 'Their centre-back Bruno wins almost every plain duel. They call him "the Wall".'],
       ['mo', 'MO', 'Then we go around the wall. Together!'],
       ['ito', 'COACH ITO', 'Use Mo. Use your special. And watch the ring.']],
+  3: [['ito', 'COACH ITO', 'Storm Academy. Ren\'s team. They pass fast and think faster.'],
+      ['ren', 'REN', 'So the amateur beat the Wall. Cute. My Frost Spiral has never been stopped.'],
+      ['mo', 'MO', 'Then today is the first time. Right, Kai?'],
+      ['ito', 'COACH ITO', 'When Ren shoots, your keeper needs you. Nail that ring.']],
 };
 function story(then) {
   const lines = STORY[save.match] || []; let i = 0, done = false;
@@ -178,7 +185,7 @@ function story(then) {
     if (i >= lines.length) { if (!done) { done = true; s.onclick = null; then(); } return; }
     const [face, name, text] = lines[i];
     s.style.background = `linear-gradient(rgba(5,10,8,.55), rgba(5,10,8,.85)), url(img/bg_school.jpg) center/cover`;
-    s.innerHTML = `<img class="face-big" src="img/face_${face}.jpg" alt="" style="border-color:${face === 'mo' ? '#e23b3b' : '#3c9'}"><div class="bubble"><b>${name}</b>${text}</div><p class="small">tap to continue</p>`;
+    s.innerHTML = `<img class="face-big" src="img/face_${face}.jpg" alt="" style="border-color:${face === 'mo' ? '#e23b3b' : face === 'ren' ? '#8fd8ff' : '#3c9'}"><div class="bubble"><b>${name}</b>${text}</div><p class="small">tap to continue</p>`;
   };
   s.onclick = () => { i++; draw(); if (BOT && !done) botGo(s, 300); };
   show('story'); draw(); botGo(s, 300);
@@ -189,7 +196,7 @@ function nextMatch() {
   const opp = OPPS[save.match - 1], n = $('nextm'); let left = 5, gone = false;
   const go = () => { if (gone) return; gone = true; clearInterval(iv); startMatch(); };
   n.innerHTML = `<p class="bang" style="font-size:22px;color:#8fd8ff">MATCH ${save.match}</p><h1 class="bang">${opp.name.toUpperCase()}</h1>
-    ${opp.boss ? `<img class="face-big" src="img/face_${opp.boss.toLowerCase()}.jpg" alt="" style="border-color:#aab"><p><b>${opp.boss}</b> · "the Wall"</p>` : ''}
+    ${opp.boss ? `<img class="face-big" src="img/face_${opp.boss.toLowerCase()}.jpg" alt="" style="border-color:#aab"><p><b>${opp.boss}</b> · "${opp.tag || 'the Wall'}"</p>` : ''}
     <div class="count" id="cd">5</div><button class="btn" id="go">KICK OFF</button>`;
   show('nextm');
   var iv = setInterval(() => { left--; if ($('cd')) $('cd').textContent = left; if (left <= 0) go(); }, 1000 / FAST);
@@ -197,10 +204,10 @@ function nextMatch() {
 }
 
 // ---------------------------------------------------------------- feedback (fun 1–5 + comment), then the teaser
-function feedback() {
+function feedback(then) {
   const f = $('feedback'); let fun = 0;
   const consented = LS.get('ss.consent') === 'yes';
-  f.innerHTML = `<h2 class="bang">YOU FINISHED THE PREVIEW!</h2><p>How fun was it?</p>
+  f.innerHTML = `<h2 class="bang">QUICK QUESTION</h2><p>Before you face Ren: how fun has it been so far?</p>
     <div class="rate">${[1, 2, 3, 4, 5].map(v => `<button data-v="${v}">${v}</button>`).join('')}</div><p class="small">1 = boring · 5 = loved it</p>
     <textarea id="fbt" maxlength="240" placeholder="Anything to tell us? What was fun, what was boring? (optional)"></textarea>
     <button class="btn" id="fbs" disabled style="opacity:.5">SEND</button>
@@ -208,19 +215,19 @@ function feedback() {
     <button class="link" id="fbskip">skip</button>`;
   show('feedback');
   f.querySelectorAll('[data-v]').forEach(b => b.onclick = () => { fun = +b.dataset.v; f.querySelectorAll('[data-v]').forEach(x => x.classList.toggle('sel', x === b)); $('fbs').disabled = false; $('fbs').style.opacity = 1; });
-  $('fbs').onclick = () => { track('feedback', { fun, comment: $('fbt').value.slice(0, 240), style: save.style, lvl: save.lvl }, true); save.fb = true; store(); ending(); };
-  $('fbskip').onclick = () => { track('feedback_skip', {}); ending(); };
+  $('fbs').onclick = () => { track('feedback', { fun, comment: $('fbt').value.slice(0, 240), style: save.style, lvl: save.lvl }, true); save.fb = true; store(); (then || ending)(); };
+  $('fbskip').onclick = () => { track('feedback_skip', {}); (then || ending)(); };
   if (BOT) { botGo(f.querySelector('[data-v="4"]'), 300); botGo($('fbs'), 700); }
 }
 function ending() {
   const e = $('ending');
   e.innerHTML = `<h1 class="bang">TO BE<br>CONTINUED...</h1><img class="face-big" src="img/face_ren.jpg" alt="">
-    <div class="bubble"><b style="color:#2a7fb8">REN</b>Storm Academy is next, ${save.name}. Try not to bore me.</div>
-    <p>Match 3 (Ren), match 4 and the Final are coming next.</p>
-    <button class="btn" id="again">REPLAY MATCH 2</button><button class="btn alt" id="newseason">NEW SEASON · TRY ANOTHER STYLE</button>
+    <div class="bubble"><b style="color:#2a7fb8">REN</b>${save.lastRes === 'w' ? `Hmph. Enjoy it, ${save.name}. Next time I won't hold back.` : `Is that all, ${save.name}? Come back when your Comet Drive actually burns.`}</div>
+    <p>Match 4 (Kings of Sand) and the Final against Sora are coming next.</p>
+    <button class="btn" id="again">REPLAY MATCH 3</button><button class="btn alt" id="newseason">NEW SEASON · TRY ANOTHER STYLE</button>
     <p class="small">Thanks for playing the preview!</p>`;
   show('ending');
-  $('again').onclick = () => { save.match = 2; startMatch(); };
+  $('again').onclick = () => { save.match = 3; startMatch(); };
   $('newseason').onclick = () => { save = fresh(); save.plays = 1; store(); title(); };
 }
 

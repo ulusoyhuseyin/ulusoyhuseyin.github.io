@@ -6,7 +6,7 @@
 const chance = (a, b, k = .035) => clamp(.5 + (a - b) * k, .08, .92);
 function shotChance(p, gk, special) {
   const d = distToGoal(p);
-  let c = chance(p.st.shoot, gk.st.catch + 2.5) - Math.max(0, d - 13) * .018 + (save.style === 'striker' && p === G.hero ? .05 : 0);
+  let c = chance(p.st.shoot, gk.st.catch + 2.5) - Math.max(0, d - 13) * .018 - anglePen(p) + (save.style === 'striker' && p === G.hero ? .05 : 0);
   if (special) c += .3;
   return clamp(c, .08, special ? .9 : .8);
 }
@@ -41,8 +41,8 @@ function openScene(kind, cx) {
       if (hero && mo.stun <= 0) add({ key: 'onetwo', name: 'ONE-TWO · MO', sub: 'safer · gains less ground', ch: chance(me.st.pass + 3 + (save.style === 'playmaker' ? 1.5 : 0), them.st.tackle * .4 + them.st.speed * .4 + 2 + (kind === 'squeeze' ? 1.5 : 0)), kind: 'duel' });
       else if (!hero) add({ key: 'tokai', name: `PASS → ${save.name}`, sub: 'find your striker', ch: chance(me.st.pass + 3, them.st.tackle * .4 + them.st.speed * .4 + 2), kind: 'duel' });
       if (kind === 'squeeze') add({ key: 'back', name: 'BACK PASS', sub: 'safe · start again', noRoll: true, cls: 'safe' });
-      else if (distToGoal(me) < 32) add({ key: 'longshot', name: 'LONG SHOT', sub: `from ${Math.round(distToGoal(me))} m`, ch: shotChance(me, gk, false), kind: 'shot' });
-      if (hero && distToGoal(me) < 30) add({ key: 'comet', name: 'COMET DRIVE!', sub: `special shot · ${cost} spirit`, ch: shotChance(me, gk, true), kind: 'shot', special: 'comet', cost, cls: 'sp' });
+      else if (distToGoal(me) < 32 && angleOk(me)) add({ key: 'longshot', name: 'LONG SHOT', sub: `from ${Math.round(distToGoal(me))} m`, ch: shotChance(me, gk, false), kind: 'shot' });
+      if (hero && distToGoal(me) < 30 && angleOk(me)) add({ key: 'comet', name: 'COMET DRIVE!', sub: `special shot · ${cost} spirit`, ch: shotChance(me, gk, true), kind: 'shot', special: 'comet', cost, cls: 'sp' });
       if (hero && save.style === 'playmaker') add({ key: 'needle', name: 'NEEDLE PASS!', sub: `special · sends Mo 1-on-1 · ${cost} spirit`, ch: chance(me.st.pass + 10, hard), kind: 'duel', special: 'needle', cost, cls: 'sp' });
       if (them.name === 'Bruno') hint = 'Bruno wins plain dribbles. Go around him: ONE-TWO, or a special.';
       else if (kind === 'squeeze') hint = 'Two of them. Risky move or safe reset?';
@@ -74,11 +74,12 @@ function openScene(kind, cx) {
     if (me === G.hero && save.style === 'engine') add({ key: 'clamp', name: 'IRON CLAMP!', sub: `special tackle · ${cost} spirit`, ch: chance(me.st.tackle + 10, them.st.dribble), kind: 'duel', special: 'clamp', cost, cls: 'sp' });
   } else if (kind === 'save') {
     const gkp = me, def = G.P.filter(q => q.team === 0 && q.role === 'DF' && q.stun <= 0).sort((a, b) => dist(a, them) - dist(b, them))[0];
-    title = cx.final ? 'HOLD THE LEAD!' : `${them.name.toUpperCase()} SHOOTS!`; sub = `${gkp.name} in goal`;
-    add({ key: 'dive', name: 'DIVE!', sub: `${gkp.name} goes for it`, ch: chance(gkp.st.catch, them.st.shoot), kind: 'save' });
-    add({ key: 'rush', name: 'RUSH OUT', sub: 'risky · a save starts a counter', ch: chance(gkp.st.catch - 2, them.st.dribble), kind: 'save', big: true });
+    title = cx.rival ? `${cx.rival.name}!` : cx.final ? 'HOLD THE LEAD!' : `${them.name.toUpperCase()} SHOOTS!`; sub = `${gkp.name} in goal${cx.rival ? ` · ${them.name}'s special` : ''}`;
+    const rp = cx.rival ? cx.rival.pen : 0;
+    add({ key: 'dive', name: 'DIVE!', sub: `${gkp.name} goes for it`, ch: chance(gkp.st.catch, them.st.shoot) - rp, kind: 'save' });
+    add({ key: 'rush', name: 'RUSH OUT', sub: 'risky · a save starts a counter', ch: chance(gkp.st.catch - 2, them.st.dribble) - rp, kind: 'save', big: true });
     if (def && dist(def, them) < 12) add({ key: 'slide', name: `${def.name.toUpperCase()} SLIDES`, sub: 'block before the shot', ch: chance(def.st.tackle, them.st.shoot + 1), kind: 'duel', def });
-    hint = 'Their shot! Your keeper needs you.';
+    hint = cx.rival ? `A rival special: −${Math.round(rp * 100)}% to save it. Nail the ring!` : 'Their shot! Your keeper needs you.';
   }
   for (const o of opts) if (o.cost && sp < o.cost) o.disabled = true;
   showScene(kind, cx, title, sub, hint, opts);
@@ -104,7 +105,7 @@ function showScene(kind, cx, title, sub, hint, opts) {
     row.appendChild(b);
   }
   delete box.dataset.busy; box.classList.add('on');
-  $('pl').style.display = 'none'; document.querySelectorAll('#acts button').forEach(b => b.classList.remove('on'));
+  $('pl').style.display = 'none'; document.querySelectorAll('#acts button, #bPlan').forEach(b => b.classList.remove('on'));
   G.sceneOpen = performance.now();
   if (BOT) setTimeout(() => { const ok = opts.filter(o => !o.disabled); const o = ok.find(x => x.special && Math.random() < .7) || pick(ok); if (G && G.paused && !box.dataset.busy) { box.dataset.busy = '1'; choose(kind, cx, o); } }, 300 / FAST);
 }
@@ -154,7 +155,11 @@ async function consequence(kind, cx, o, win) {
         me.ghost = 1; me.x += dir * 1.6; me.y -= o.key === 'dribble2' ? 7 : 3; me.vx = dir * 6; me.vy = -12; G.chain = true;
         pop(me.x, me.y - 2, o.key === 'dribble2' ? 'THROUGH BOTH!' : 'PAST HIM!', '#ffd23f');
         if (G.tut === 1) { G.tut = 2; G.sp = G.spMax; setHint('Run at goal! The keeper is next.'); }
-      } else { own(them); me.stun = 1.1; burst(me.x, me.y, 14, '#c9b58a', 4); pop(them.x, them.y - 2, them.name === 'Bruno' ? 'THE WALL!' : 'STOLEN!', '#ff6b6b'); }
+      } else {
+        const rs = RIVAL_SP[them.name], used = (G.rivalUsed = G.rivalUsed || {});
+        if (rs && !rs.pen && (used[them.name] || 0) < 2) { used[them.name] = (used[them.name] || 0) + 1; await techFX(rs.name, rs.face, rs.cols, 1.2, false); if (!G) return; }
+        own(them); me.stun = 1.1; burst(me.x, me.y, 14, '#c9b58a', 4); pop(them.x, them.y - 2, them.name === 'Bruno' ? 'THE WALL!' : 'STOLEN!', '#ff6b6b');
+      }
       break;
     }
     case 'onetwo': {
@@ -176,7 +181,7 @@ async function consequence(kind, cx, o, win) {
       G.afterShot = null;
       shoot(me, aimFor(out), !!o.special, out);
       if (cx.final) G.len = Math.min(G.len, G.t + 3);
-      if (G.tutJustEnded === undefined && save.match === 1 && !G.tut) { G.tutJustEnded = true; G.afterGoal = () => later(1.5, () => toast('ren', 'REN', 'Not bad... for an amateur.', 3600)); G.afterShot = () => later(1.5, () => toast('ren', 'REN', 'Hmph. Is that all, amateur?', 3600)); }
+      if (G.tutJustEnded === undefined && save.match === 1 && !G.tut) { G.tutJustEnded = true; G.afterGoal = () => { later(1.5, () => toast('ren', 'REN', 'Not bad... for an amateur.', 3600)); later(6, () => setHint('Tip: tap ⏸ PLAN (or Space) any time to stop the clock and plan.', 5000)); }; G.afterShot = () => later(1.5, () => toast('ren', 'REN', 'Hmph. Is that all, amateur?', 3600)); }
       break;
     }
     case 'square': case 'shortmo': {
@@ -237,6 +242,7 @@ function clash(o, me, them) {
     let tapAt = null, q = null, msg = '', win = null, numMe = 0, numThem = 0, fin = null, t0 = performance.now(), done = false, played = false;
     const onTap = e => { if (tapAt === null && !done) { tapAt = (performance.now() - t0) / 1000; e.preventDefault(); } };
     addEventListener('pointerdown', onTap, true);
+    const onKey = e => { if (['Space', 'Enter', 'KeyK', 'KeyJ'].includes(e.code)) { e.stopPropagation(); onTap(e); } }; addEventListener('keydown', onKey, true);
     const botTap = BOT ? rnd(.55, 1) * T : null;
     snd('swoosh');
     const f = now => {
@@ -315,7 +321,7 @@ function clash(o, me, them) {
           c.strokeText(word, 0, 0); c.fillText(word, 0, 0); c.restore();
           if (o.ch < .5 && win && !shot && u < .9) { c.globalCompositeOperation = 'lighter'; focusLines(c, cx, cy, 40, R * 2, '#ffb000', .5); c.globalCompositeOperation = 'source-over'; }
         }
-        if (u > (shot ? .75 : 1.05)) { done = true; removeEventListener('pointerdown', onTap, true); c.clearRect(0, 0, CW, CH); res({ q, win }); return; }
+        if (u > (shot ? .75 : 1.05)) { done = true; removeEventListener('pointerdown', onTap, true); removeEventListener('keydown', onKey, true); c.clearRect(0, 0, CW, CH); res({ q, win }); return; }
       }
       requestAnimationFrame(f);
     };

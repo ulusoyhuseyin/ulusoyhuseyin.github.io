@@ -44,7 +44,8 @@ const AI = (() => {
   }
   function xg(q, x, y) {
     const d = Math.hypot(x - GX, atkGoalY(q.team) - y), gk = keeperOf(1 - q.team);
-    return d > 28 ? 0 : clamp(chance(q.st.shoot || 8, (gk.st.catch || 9) + 2.5) - Math.max(0, d - 13) * .018, .03, .8);
+    const fake = { x, y, team: q.team }; if (d > 28 || !angleOk(fake)) return 0;
+    return clamp(chance(q.st.shoot || 8, (gk.st.catch || 9) + 2.5) - Math.max(0, d - 13) * .018 - anglePen(fake), .03, .8);
   }
   function holdValue(q, x, y) {                               // having the ball as q at (x, y): position, space, or the shot from there
     return Math.max(posValue(q.team, x, y) - pressure(q.team, x, y) * .18, xg(q, x, y) * 2.2);
@@ -97,7 +98,7 @@ const AI = (() => {
   }
   function assignJobs() {                                     // the defending team: 1-2 press the carrier, the rest mark goal-side
     const car = G.ball.owner; G.jobs = new Map(); if (!car) return;
-    const team = 1 - car.team, nPress = team === 1 ? (iq(1) > .75 ? 2 : 1) : 0;   // our controlled player already presses for us
+    const team = 1 - car.team, nPress = team === 1 ? (iq(1) > .75 ? 2 : 1) : (G.pressT > G.t ? 2 : PLAN.tactic === 'att' ? 1 : 0);   // our controlled player presses too
     const defs = G.P.filter(q => q.team === team && q.role !== 'GK' && q !== G.ctrl && q.stun <= 0).sort((a, c) => dist(a, car) - dist(c, car));
     defs.slice(0, nPress).forEach(d => G.jobs.set(d, 'press'));
     for (const d of defs.slice(nPress)) if (d.face && team === 1 && dist(d, car) < 12) G.jobs.set(d, 'press');   // a rival never lets you pass him easily
@@ -126,5 +127,5 @@ const AI = (() => {
     const [x, y] = shiftHome(p); moveTo(p, x, y, .7);
   }
   function bestPass(p, kind) { let best = null, bv = -1e9; for (const o of options(p)) if (o.kind === kind && o.v > bv) { bv = o.v; best = o.q; } return best; }
-  return { carrier, offBall, assignJobs, bestPass, options, passSuccess, iqOf };
+  return { carrier, offBall, assignJobs, bestPass, options, passSuccess, iqOf, pressure };
 })();

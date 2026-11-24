@@ -6,17 +6,25 @@ const W = 68, H = 105, GX = 34, GOALW = 7.32;            // pitch in metres, por
 const cv = document.getElementById('game'), ctx = cv.getContext('2d');
 const fxc = document.getElementById('fx'), fx = fxc.getContext('2d');
 const $ = id => document.getElementById(id);
-let DPR = 1, CW = 0, CH = 0, S = 10;
+let DPR = 1, CW = 0, CH = 0, S = 10, ROT = false;   // ROT: wide screens show the pitch sideways, attacking to the right
 function resize() {
   DPR = Math.min(2, window.devicePixelRatio || 1); CW = innerWidth; CH = innerHeight;
   for (const c of [cv, fxc]) { c.width = CW * DPR; c.height = CH * DPR; c.style.width = CW + 'px'; c.style.height = CH + 'px'; }
-  S = CH > CW ? Math.min(CH / 38, CW / 22) : Math.min(CH / 30, CW / 40);   // close camera: pixels per metre
+  ROT = CW > CH * 1.05;
+  S = ROT ? Math.min(CW / 48, CH / 28) : Math.min(CH / 38, CW / 22);   // close camera: pixels per metre
 }
 addEventListener('resize', resize); resize();
+const s2w = (u, v) => ROT ? [v, -u] : [u, v];             // a screen direction → the world direction (pitch coordinates)
+const w2s = (x, y) => ROT ? [-y, x] : [x, y];             // a world direction → the screen direction
+function upright(c, x, y) { c.translate(x, y); if (ROT) c.rotate(-Math.PI / 2); }   // faces and text stay upright on a rotated pitch
 
 const URLP = new URLSearchParams(location.search);
 const BOT = URLP.has('bot');                              // test robot: picks options and taps rings by itself
-const FAST = +URLP.get('fast') || 1;                       // test speed-up of the pitch simulation only
+const FAST = +URLP.get('fast') || 1;
+// ?audit=1: an automatic referee for soak tests. It checks every goal and every out-of-play against the ball's real path
+// and a few invariants (no NaN, ball near the pitch, time moving, no scene stuck). Results in window.AUDIT.
+const AUD = URLP.has('audit') ? (window.AUDIT = { goals: [], outs: [], bad: [], shots: 0 }) : null;
+function audBad(kind, data) { if (AUD && AUD.bad.length < 200) AUD.bad.push({ kind, t: G ? Math.round(G.t * 10) / 10 : 0, m: G ? G.m : 0, score: G ? G.score.join('-') : '', ...data }); }                       // test speed-up of the pitch simulation only
 const rnd = (a = 1, b) => b === undefined ? Math.random() * a : a + Math.random() * (b - a);
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
 const dist = (a, b) => Math.hypot(a.x - b.x, a.y - b.y);

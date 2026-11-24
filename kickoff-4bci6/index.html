@@ -47,6 +47,25 @@
   #acts #bTackle { background: #6b4a12; width: 92px; height: 64px; font-size: 22px; }
   #acts button.far { opacity: .45; }
   #acts button:active { transform: translateY(2px); box-shadow: 0 1px 0 #000; }
+  /* PLAN: stop the clock and decide */
+  #bPlan { position: fixed; right: 10px; top: calc(10px + env(safe-area-inset-top)); z-index: 5; display: none; font-family: Bangers, sans-serif; font-size: 18px; letter-spacing: 1px;
+    border: 3px solid #000; border-radius: 14px; background: #ffd23f; color: #000; padding: 6px 10px; box-shadow: 0 3px 0 #000; }
+  #bPlan.on { display: block; }
+  #bPlan small { display: block; font-family: system-ui; font-size: 10px; letter-spacing: 0; font-weight: 700; }
+  #planbar { position: fixed; left: 50%; transform: translateX(-50%); bottom: calc(10px + env(safe-area-inset-bottom)); z-index: 7; display: none; width: min(560px, calc(100% - 20px));
+    background: rgba(5, 10, 18, .93); border: 2px solid #ffd23f; border-radius: 16px; padding: 10px 12px; text-align: center; }
+  #planbar.on { display: block; animation: up .2s ease-out; }
+  #planbar h4 { margin: 0; font-size: 18px !important; font-family: Bangers, sans-serif; letter-spacing: 1px; font-size: 22px; color: var(--gold); font-weight: 400; }
+  #planbar p { margin: 3px 0 8px; font-size: 13px; color: #cfe; }
+  #planbar p b { color: var(--gold); }
+  #planacts { display: flex; gap: 6px; justify-content: center; flex-wrap: wrap; margin-bottom: 8px; }
+  #planacts button, #planbar .tac button, #planGo { font-family: Bangers, sans-serif; letter-spacing: 1px; font-size: 18px; border: 0; border-radius: 10px; padding: 7px 12px; color: #fff; background: #26415e; box-shadow: 0 3px 0 #000; }
+  #planacts button small { display: block; font-family: system-ui; font-size: 10.5px; letter-spacing: 0; opacity: .9; }
+  #planacts button.sp { background: linear-gradient(135deg, #b3102b, #ff7a00); }
+  #planbar .tac { display: flex; gap: 4px; justify-content: center; align-items: center; font-size: 12px; flex-wrap: wrap; }
+  #planbar .tac button { font-size: 15px; padding: 5px 9px; background: #1b2a38; }
+  #planbar .tac button.sel { background: #fff; color: #000; }
+  #planbar .tac #planGo { background: var(--gold); color: #000; font-size: 19px; padding: 5px 16px; margin-left: 6px; }
   #zone { position: fixed; inset: 0; z-index: 2; pointer-events: none; box-shadow: inset 0 0 0 4px #ffd23f, inset 0 0 50px rgba(255,210,63,.55); opacity: 0; transition: opacity .4s; }
   #zone.on { opacity: 1; animation: glow .5s infinite alternate; }
   #hint { position: fixed; top: calc(70px + env(safe-area-inset-top)); left: 0; right: 0; text-align: center; z-index: 3; pointer-events: none;
@@ -155,6 +174,9 @@
 <div id="toast"><img alt=""><div><b></b><span></span></div></div>
 <div id="scene"><div class="vs"><div class="f" id="fl"></div><h3 class="bang" id="st"></h3><div class="f them" id="fr"></div></div><p id="shint"></p><div id="opts"></div></div>
 <div id="banner"></div>
+<button id="bPlan">⏸ PLAN<small>stop &amp; decide</small></button>
+<div id="planbar"><h4>⏸ PLAN · TIME STOPPED</h4><p id="planhint"></p><div id="planacts"></div>
+  <div class="tac">TEAM <button data-t="def">DEFEND</button><button data-t="bal">BALANCED</button><button data-t="att">ATTACK</button><button id="planGo">▶ PLAY</button></div></div>
 
 <div class="screen on" id="title">
   <h1 class="bang">STRIKER<br>SPIRIT</h1>
@@ -177,6 +199,7 @@
 <script src="cine.js"></script>
 <script src="match.js"></script>
 <script src="ai.js"></script>
+<script src="plan.js"></script>
 <script src="scene.js"></script>
 <script src="meta.js"></script>
 </body>
