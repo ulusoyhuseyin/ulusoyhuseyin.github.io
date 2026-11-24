@@ -21,6 +21,8 @@ function upright(c, x, y) { c.translate(x, y); if (ROT) c.rotate(-Math.PI / 2); 
 const URLP = new URLSearchParams(location.search);
 const BOT = URLP.has('bot');                              // test robot: picks options and taps rings by itself
 const FAST = +URLP.get('fast') || 1;
+// game pace: the whole pitch simulation runs at 75% speed, so small hands and young players have time to see, think and tap (owner, 24 Nov)
+const PACE = .75;
 // ?audit=1: an automatic referee for soak tests. It checks every goal and every out-of-play against the ball's real path
 // and a few invariants (no NaN, ball near the pitch, time moving, no scene stuck). Results in window.AUDIT.
 const AUD = URLP.has('audit') ? (window.AUDIT = { goals: [], outs: [], bad: [], shots: 0, n: {} }) : null;

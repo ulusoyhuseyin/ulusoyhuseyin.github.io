@@ -51,6 +51,8 @@ function startMatch() {
 // ---------------------------------------------------------------- result
 function finish() {
   G.over = true; snd('whistle');
+  if (AUD) { const avg = t => Math.round(G.P.filter(q => q.team === t && q.role !== 'GK').reduce((s, q) => s + q.en, 0) / 10);
+    (AUD.stam = AUD.stam || []).push({ heroMin: Math.round(G.heroMin), heroEnd: Math.round(G.hero.en), us: avg(0), them: avg(1), half: !!G.half }); }
   const st = G.stat, [a, b] = G.score, res = a > b ? 'w' : a === b ? 'd' : 'l', m = G.m;
   const wonRate = st.dec ? st.won / st.dec : 0, perfRate = st.dec ? st.perfect / st.dec : 0;
   const pts = (a - b) * 2 + (res === 'w' ? 3 : res === 'd' ? 1 : 0) + wonRate * 5 + perfRate * 4 + st.goals * .5;
@@ -58,7 +60,7 @@ function finish() {
   const xp = 50 + (res === 'w' ? 40 : res === 'd' ? 15 : 5) + st.goals * 20 + st.assists * 12 + st.won * 4 + st.perfect * 3;
   const real = Math.round((performance.now() - G.real0) / 1000);
   const inRange = st.chances.filter(c => c >= 45 && c <= 75).length;
-  const summary = { len: G.opp.len, free: st.free || 0, oppPasses: st.oppPasses || 0, m, res, score: `${a}-${b}`, grade, dec: st.dec, won: st.won, perfect: st.perfect, good: st.good, upset: st.upset, specials: st.specials, goals: st.goals, assists: st.assists, real, think: Math.round(st.think || 0), oddsBand: st.chances.length ? Math.round(inRange / st.chances.length * 100) : 0, steered: !!G.touched };
+  const summary = { len: G.opp.len, pace: PACE, free: st.free || 0, oppPasses: st.oppPasses || 0, m, res, score: `${a}-${b}`, grade, dec: st.dec, won: st.won, perfect: st.perfect, good: st.good, upset: st.upset, specials: st.specials, goals: st.goals, assists: st.assists, real, think: Math.round(st.think || 0), oddsBand: st.chances.length ? Math.round(inRange / st.chances.length * 100) : 0, steered: !!G.touched };
   window.LAST = { ...summary, chances: st.chances, gaps: st.gaps, kinds: st.kinds };
   track('m_end', summary);
   save.plays = (save.plays || 0) + 1; save.rec.push({ m, res, a, b, grade });
@@ -134,7 +136,7 @@ function training(then) {
     const [n, st] = cards[+b.dataset.i];
     t.innerHTML = `<h2 class="bang">${n}</h2><p id="drill">Tap when the ring hits the circle!</p>`;
     fxc.style.zIndex = 20; let perf = 0;
-    for (let i = 0; i < 3; i++) { const q = await ringTap(1.05 - i * .08, `${i + 1} / 3`); if (q === 'perfect') perf++; $('drill').textContent = `${perf} PERFECT so far`; }
+    for (let i = 0; i < 3; i++) { const q = await ringTap(1.5 - i * .1, `${i + 1} / 3`); if (q === 'perfect') perf++; $('drill').textContent = `${perf} PERFECT so far`; }
     fxc.style.zIndex = '';
     const before = save.stats[st]; save.stats[st] += 2 + perf; store(); track('train', { card: st, perf });
     t.innerHTML = `<h2 class="bang">${n}</h2><p class="unlock bang">${st.toUpperCase()} ${before} → ${save.stats[st]}</p><p>${perf ? `${perf} PERFECT: +${perf} bonus.` : 'No PERFECT this time. Watch the ring, then tap.'}</p><button class="btn" id="tdone">CONTINUE</button>`;
@@ -153,7 +155,7 @@ function ringTap(T, label) {                               // one timing ring on
       const t = (now - t0) / 1000; if (BOT && tapAt === null && t >= botT) tapAt = botT;
       const c = fx; c.setTransform(DPR, 0, 0, DPR, 0, 0); c.clearRect(0, 0, CW, CH);
       const R = Math.min(CW, CH) * .14, cx = CW / 2, cy = CH * .55, rr = x => R * (3 - 2.6 * Math.min(x, T) / T);
-      if (!q && (tapAt !== null || t > T + .1)) { const err = tapAt === null ? 9 : rr(tapAt) / R - 1; q = Math.abs(err) <= .12 ? 'perfect' : Math.abs(err) <= .32 ? 'good' : 'miss'; qt = t; snd(q === 'perfect' ? 'perfect' : q === 'good' ? 'good' : 'tick'); }
+      if (!q && (tapAt !== null || t > T + .1)) { const err = tapAt === null ? 9 : rr(tapAt) / R - 1; q = Math.abs(err) <= .14 ? 'perfect' : Math.abs(err) <= .38 ? 'good' : 'miss'; qt = t; snd(q === 'perfect' ? 'perfect' : q === 'good' ? 'good' : 'tick'); }
       c.strokeStyle = '#fff'; c.lineWidth = 5; c.beginPath(); c.arc(cx, cy, R, 0, 7); c.stroke();
       c.strokeStyle = 'rgba(255,210,63,.35)'; c.lineWidth = R * .24; c.beginPath(); c.arc(cx, cy, R, 0, 7); c.stroke();
       c.strokeStyle = q === 'perfect' ? '#ffd23f' : '#ff9b3f'; c.lineWidth = 6; c.beginPath(); c.arc(cx, cy, Math.max(4, rr(tapAt !== null ? tapAt : t)), 0, 7); c.stroke();

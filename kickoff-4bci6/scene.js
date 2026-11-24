@@ -10,7 +10,7 @@ function shotChance(p, gk, special) {
   if (special) c += .3;
   return clamp(c, .08, special ? .9 : .8);
 }
-const EN = { dribble: 14, dribble2: 20, onetwo: 6, tokai: 4, back: 0, longshot: 6, comet: 18, needle: 10, shoot: 6, curl: 6, square: 4, shortmo: 4, tackle: 12, clamp: 16, block: 7, hold: 0, dive: 0, rush: 0, slide: 10 };
+const EN = { dribble: 14, dribble2: 22, onetwo: 6, tokai: 4, back: 0, longshot: 6, comet: 28, needle: 18, shoot: 6, curl: 6, square: 4, shortmo: 4, tackle: 12, clamp: 24, block: 7, hold: 0, dive: 0, rush: 0, slide: 10 };
 function bonuses(o, actor) {                                 // visible boosts and penalties: ZONE, "fighting spirit" after two lost clashes in a row, TIRED
   let add = 0; const tags = [];
   const tp = actor ? tiredPen(actor) : 0; if (tp > .005) { add -= tp; tags.push(`TIRED −${Math.round(tp * 100)}`); }
@@ -82,6 +82,7 @@ function openScene(kind, cx) {
     hint = cx.rival ? `A rival special: −${Math.round(rp * 100)}% to save it. Nail the ring!` : 'Their shot! Your keeper needs you.';
   }
   for (const o of opts) if (o.cost && sp < o.cost) o.disabled = true;
+  for (const o of opts) if (o.special && !o.tut && (o.def || me).en < o.en) { o.disabled = true; o.tired = true; }   // too tired for a special: rest first
   showScene(kind, cx, title, sub, hint, opts);
 }
 function faceDiv(el, p) {
@@ -99,7 +100,7 @@ function showScene(kind, cx, title, sub, hint, opts) {
     const b = document.createElement('button'); b.className = o.cls || ''; b.disabled = !!o.disabled;
     const pc = o.noRoll ? '' : Math.round(o.ch * 100) + '%', col = o.ch >= .65 ? '#7dff9a' : o.ch >= .45 ? '#ffd23f' : '#ff8a7a';
     b.innerHTML = `<span class="n">${o.name}</span>${o.noRoll ? '<span class="p" style="color:#9fe">SAFE</span>' : `<span class="p" style="color:${col}">${pc}</span>`}` +
-      `<small>${o.sub}${o.en ? ` · <b style="color:#9dffb0">⚡−${o.en}</b>` : o.key === 'hold' ? ' · <b style="color:#9dffb0">⚡+10</b>' : ''}${(o.tags || []).map(t => `<span class="tag">${t}</span>`).join('')}${o.disabled ? ` · need ${o.cost}` : ''}</small>` +
+      `<small>${o.sub}${o.en ? ` · <b style="color:#9dffb0">⚡−${o.en}</b>` : o.key === 'hold' ? ' · <b style="color:#9dffb0">⚡+10</b>' : ''}${(o.tags || []).map(t => `<span class="tag">${t}</span>`).join('')}${o.tired ? ` · too tired: need ⚡${o.en}` : o.disabled ? ` · need ${o.cost}` : ''}</small>` +
       (o.noRoll ? '' : `<i class="bar" style="width:${o.ch * 100}%;color:${col}"></i>`);
     b.onclick = () => { if (box.dataset.busy) return; box.dataset.busy = '1'; choose(kind, cx, o); };
     row.appendChild(b);
@@ -233,7 +234,7 @@ function toast(face, name, text, ms = 3000) {
 // ---------------------------------------------------------------- the clash: split faces, power count-up, timing ring, then the reveal
 function faceArt(p) { return p.face ? IMG['face_' + p.face] : null; }
 function clash(o, me, them) {
-  const tut = !!o.tut, T = tut ? 1.7 : G.m >= 2 ? .95 : 1.1, shot = o.kind === 'shot';
+  const tut = !!o.tut, T = tut ? 2.2 : G.m >= 2 ? 1.35 : 1.55, shot = o.kind === 'shot';   // slow enough for young players (owner, 24 Nov)
   const firstRings = (save.rings || 0) < 2; save.rings = (save.rings || 0) + 1;
   return new Promise(res => {
     let tapAt = null, q = null, msg = '', win = null, numMe = 0, numThem = 0, fin = null, t0 = performance.now(), done = false, played = false;
@@ -251,8 +252,8 @@ function clash(o, me, them) {
       if (q === null && (tapAt !== null || t > T)) {
         if (tapAt === null) { q = 'miss'; msg = 'MISSED THE RING'; }
         else { const err = ringR(tapAt) / R - 1;               // >0 = early, <0 = late
-          if (Math.abs(err) <= .12) { q = 'perfect'; msg = 'PERFECT!'; snd('perfect'); buzz(25); }
-          else if (Math.abs(err) <= .32) { q = 'good'; msg = err > 0 ? 'GOOD · a bit early' : 'GOOD · a bit late'; snd('good'); }
+          if (Math.abs(err) <= .14) { q = 'perfect'; msg = 'PERFECT!'; snd('perfect'); buzz(25); }
+          else if (Math.abs(err) <= .38) { q = 'good'; msg = err > 0 ? 'GOOD · a bit early' : 'GOOD · a bit late'; snd('good'); }
           else { q = 'miss'; msg = err > 0 ? 'TOO EARLY' : 'TOO LATE'; } }
         const p = clamp(o.ch + RING_BONUS[q], 0, 1); win = tut ? true : Math.random() < p;
         const base = 40 + p * 55 + rnd(-4, 4), other = 40 + (1 - p) * 55 + rnd(-4, 4);

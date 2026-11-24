@@ -62,7 +62,8 @@ const AI = (() => {
       if (q.team !== team || q === p || q.role === 'GK' || q.stun > 0) continue;
       const d = dist(p, q); if (d < 4 || d > 50) continue;
       const lofted = d > 24, lx = q.x + q.vx * .5, ly = q.y + q.vy * .5, ps = passSuccess(p, lx, ly, lofted);
-      out.push({ kind: lofted ? 'long' : 'pass', q, p: ps, v: ps * holdValue(q, lx, ly) - (1 - ps) * lossCost(team, (p.y + ly) / 2) - (lofted ? .03 : 0) });
+      const fwd = .45 * (prog(team, ly) - prog(team, p.y));   // football goes forward: a pass that gains ground is worth more, a back pass less
+      out.push({ kind: lofted ? 'long' : 'pass', q, p: ps, v: ps * holdValue(q, lx, ly) - (1 - ps) * lossCost(team, (p.y + ly) / 2) - (lofted ? .03 : 0) + fwd });
     }
     const x = xg(p, p.x, p.y); if (x > 0) out.push({ kind: 'shoot', p: x, v: x * 2.2 + (1 - x) * .1 });
     out.push({ kind: 'hold', p: 1, v: holdValue(p, p.x, p.y) - .05 });
@@ -119,13 +120,15 @@ const AI = (() => {
     if (car.team === p.team) {                                // support run
       p.spotT = (p.spotT || 0) - dt;
       if (p.spotT <= 0 || !p.spot) { p.spotT = rnd(.8, 1.3); p.spot = supportSpot(p, car); }
-      return moveTo(p, p.spot[0], p.spot[1], .8);
+      const behind = (p.team === 0 ? p.y - p.spot[1] : p.spot[1] - p.y) > 4;   // a forward run to get ahead of the ball is run hard
+      return moveTo(p, p.spot[0], p.spot[1], p.en < 30 ? .5 : behind ? .95 : .75);
     }
     const job = G.jobs && G.jobs.get(p);
     if (job === 'press') return moveTo(p, car.x, car.y + (p.team === 1 ? -1 : 1), .98);
-    if (job) { const g = ownGoalY(p.team), dx = GX - job.x, dy = g - job.y, d = Math.hypot(dx, dy) || 1; return moveTo(p, job.x + dx / d * 2.2, job.y + dy / d * 2.2, .85); }
-    const [x, y] = shiftHome(p); moveTo(p, x, y, .7);
+    if (job) { const g = ownGoalY(p.team), dx = GX - job.x, dy = g - job.y, d = Math.hypot(dx, dy) || 1; return moveTo(p, job.x + dx / d * 2.2, job.y + dy / d * 2.2, p.en < 30 ? .6 : .85); }
+    const [x, y] = shiftHome(p); moveTo(p, x, y, p.en < 40 ? .5 : .7);   // nothing to do: a tired player walks back into shape and recovers
   }
+  function rankPass(p, kind) { return options(p).filter(o => o.kind === kind).sort((a, c) => c.v - a.v); }
   function bestPass(p, kind) { let best = null, bv = -1e9; for (const o of options(p)) if (o.kind === kind && o.v > bv) { bv = o.v; best = o.q; } return best; }
-  return { carrier, offBall, assignJobs, bestPass, options, passSuccess, iqOf, pressure };
+  return { carrier, offBall, assignJobs, bestPass, rankPass, options, passSuccess, iqOf, pressure };
 })();

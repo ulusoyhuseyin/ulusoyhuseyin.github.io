@@ -5,15 +5,15 @@
 // 11 a side, 4-3-3 for both teams. Our team attacks up; the other team's spots are mirrored.
 const FORM = { GK: [34, 101], DF1: [12, 84], DF2: [26, 87], DF3: [42, 87], DF4: [56, 84], MF1: [18, 70], MF2: [34, 72], MF3: [50, 70], FW1: [14, 57], FW2: [34, 54], FW3: [54, 57] };
 const OPPS = [
-  { name: 'Harbor Gulls', short: 'GUL', col: '#2f9e5b', gk: '#1b1b1b', bg: 'stadium', len: 130, iq: .55, base: { shoot: 6, dribble: 6.5, pass: 7, tackle: 6.5, speed: 8.5, catch: 8, stamina: 9 },
+  { name: 'Harbor Gulls', short: 'GUL', col: '#2f9e5b', gk: '#1b1b1b', bg: 'stadium', len: 120, iq: .55, base: { shoot: 6, dribble: 6.5, pass: 7, tackle: 6.5, speed: 8.5, catch: 8, stamina: 9 },
     P: [['GK', 'Pike', 1, { catch: 9 }], ['DF1', 'Ivo', 2, { tackle: 7 }], ['DF2', 'Bram', 3, { tackle: 7 }], ['DF3', 'Oren', 4, { tackle: 7.5 }], ['DF4', 'Finn', 5, { tackle: 6.5, speed: 9.5 }],
       ['MF1', 'Cal', 6, { pass: 8, dribble: 8 }], ['MF2', 'Vik', 10, { pass: 8.5, dribble: 8, tackle: 7 }], ['MF3', 'Noah', 8, { tackle: 7.5 }],
       ['FW1', 'Rhys', 11, { shoot: 8, dribble: 8, speed: 10 }], ['FW2', 'Zane', 7, { shoot: 9, dribble: 8, speed: 10 }], ['FW3', 'Kit', 9, { shoot: 8, dribble: 8.5, speed: 10 }]] },
-  { name: 'Iron Valley', short: 'IRV', col: '#5d6773', gk: '#e9e9e9', bg: 'rain', len: 130, iq: .85, boss: 'Bruno', base: { shoot: 8, dribble: 8, pass: 8.5, tackle: 9, speed: 9.5, catch: 9, stamina: 10 },
+  { name: 'Iron Valley', short: 'IRV', col: '#5d6773', gk: '#e9e9e9', bg: 'rain', len: 120, iq: .85, boss: 'Bruno', base: { shoot: 8, dribble: 8, pass: 8.5, tackle: 9, speed: 9.5, catch: 9, stamina: 10 },
     P: [['GK', 'Holt', 1, { catch: 10 }], ['DF1', 'Flint', 2, { tackle: 10 }], ['DF2', 'Bruno', 5, { tackle: 18, dribble: 7, speed: 8, stamina: 14 }, 'bruno'], ['DF3', 'Gage', 4, { tackle: 10.5 }], ['DF4', 'Stone', 3, { tackle: 10, speed: 10 }],
       ['MF1', 'Mace', 6, { tackle: 10 }], ['MF2', 'Rook', 8, { pass: 10, dribble: 10, tackle: 10 }], ['MF3', 'Pierce', 7, { pass: 9.5, dribble: 9 }],
       ['FW1', 'Cole', 11, { shoot: 10, dribble: 9.5, speed: 10.5 }], ['FW2', 'Dax', 9, { shoot: 11.5, dribble: 10.5, speed: 11 }], ['FW3', 'Vance', 10, { shoot: 10, dribble: 9.5 }]] },
-  { name: 'Storm Academy', short: 'STA', col: '#5fb4e6', gk: '#1b1b1b', bg: 'school', len: 130, iq: .9, boss: 'Ren', tag: 'the prodigy', base: { shoot: 9, dribble: 9.5, pass: 10, tackle: 10, speed: 10.5, catch: 10, stamina: 11 },
+  { name: 'Storm Academy', short: 'STA', col: '#5fb4e6', gk: '#1b1b1b', bg: 'school', len: 120, iq: .9, boss: 'Ren', tag: 'the prodigy', base: { shoot: 9, dribble: 9.5, pass: 10, tackle: 10, speed: 10.5, catch: 10, stamina: 11 },
     P: [['GK', 'Ise', 1, { catch: 11 }], ['DF1', 'Yuri', 2, { tackle: 11 }], ['DF2', 'Kenji', 5, { tackle: 11.5 }], ['DF3', 'Noel', 4, { tackle: 11 }], ['DF4', 'Ash', 3, { tackle: 10.5, speed: 11 }],
       ['MF1', 'Taro', 6, { pass: 11, tackle: 10.5 }], ['MF2', 'Lio', 8, { pass: 11.5, dribble: 10.5 }], ['MF3', 'Remy', 7, { pass: 10.5, tackle: 11 }],
       ['FW1', 'Haru', 11, { shoot: 11, dribble: 10.5, speed: 11 }], ['FW2', 'Ren', 10, { shoot: 14, dribble: 14, pass: 11, speed: 12, stamina: 13 }, 'ren'], ['FW3', 'Max', 9, { shoot: 10.5, dribble: 10 }]] },
@@ -22,8 +22,8 @@ const OPPS = [
 const RIVAL_SP = { Ren: { name: 'FROST SPIRAL', face: 'ren', cols: ['#e8fbff', '#7fd8ff', '#0b2f4a'], pen: .15 }, Bruno: { name: 'IRON WALL', face: 'bruno', cols: ['#f2f4f8', '#9aa7b5', '#2b333d'] } };
 async function rivalShot(car, final) {                       // their shot at your goal; a rival may unleash a special first
   const rs = RIVAL_SP[car.name], used = (G.rivalUsed = G.rivalUsed || {});
-  if (rs && rs.pen && (used[car.name] || 0) < 2 && (final || Math.random() < .7)) {
-    used[car.name] = (used[car.name] || 0) + 1; G.paused = true;
+  if (rs && rs.pen && (used[car.name] || 0) < 2 && car.en >= 25 && (final || Math.random() < .7)) {   // rivals pay energy for specials too
+    used[car.name] = (used[car.name] || 0) + 1; G.paused = true; car.en = Math.max(0, car.en - 25);
     if (car.name === 'Ren') await techRen(rs.name, (used[car.name] || 0) > 1); else await techFX(rs.name, rs.face, rs.cols, 1.5, false);
     if (!G || G.over) return; G.paused = false;
     return openScene('save', { me: keeperOf(0), them: car, final, rival: rs });
@@ -92,7 +92,7 @@ const endTouch = e => {
   const recent = touch.hist.filter(h => now - h[0] < 120); const r0 = recent[0] || [touch.t0, touch.x0, touch.y0];
   const [vx, vy] = s2w((e.clientX - r0[1]) / Math.max(16, now - r0[0]), (e.clientY - r0[2]) / Math.max(16, now - r0[0]));
   if (!G.paused && !G.tut && touch.owner === G.ball.owner) {      // the ball changed hands during the touch: do nothing
-    if (d < 12 && dur < 300) tapPass(e.clientX, e.clientY);
+    if (d < 18 && dur < 450) tapPass(e.clientX, e.clientY);
     else if (dur < 350 && d > 40 && Math.hypot(vx, vy) > .9 && vy < -.4) flick(vx, vy);   // only a quick swipe shoots; letting go of a steer never does
   }
   touch = null; steer = null;
@@ -125,7 +125,7 @@ function pass(p, t, safe) {
   b.owner = null; b.vx = (tx - p.x) / d * sp; b.vy = (ty - p.y) / d * sp; b.noPick = p; b.noPickT = .35; b.passTo = t; b.last = p;
   b.rolls = new Map(foes(p).map(q => [q, safe ? false : Math.random() < clamp(.2 + ((q.st.tackle || 8) - (p.st.pass || 9)) * .04, .05, .6)]));
   if (p.team === 0) G.lastPasser = p;
-  snd('kick');
+  audDir(p, ty); snd('kick');
 }
 function passPoint(p, tx, ty) {                              // a through ball into space (one-two return)
   const b = G.ball; atFeet(b, p, tx, ty); const d = Math.hypot(tx - p.x, ty - p.y) || 1, sp = clamp(11 + d * .6, 13, 24);
@@ -154,18 +154,36 @@ function shoot(p, aimX, special, out) {                      // out is decided b
 }
 
 // ---------------------------------------------------------------- simulation
-function speedOf(p) { return (5.2 + (p.st.speed || 8) * .17) * (G.ball.owner === p ? .86 : 1) * (.78 + .22 * Math.min(1, p.en / 50)); }
-const tiredPen = p => p.role === 'GK' || p.en >= 40 ? 0 : (40 - p.en) / 40 * .12;
+// Stamina (owner, 24 Nov): everyone starts at 100. Sprinting drains fast, running drains slowly, walking or standing recovers.
+// The most you can get back (the cap) also shrinks as the match goes on, so it can't be refilled for free. Half-time gives +25.
+// Tired players (under 60) run slower and (under 45) lose points on every chance; specials need the energy they cost.
+const topSpeed = p => 5.2 + (p.st.speed || 8) * .17;
+function speedOf(p) { return topSpeed(p) * (G.ball.owner === p ? .86 : 1) * (.62 + .38 * Math.min(1, p.en / 60)); }
+const tiredPen = p => p.role === 'GK' || p.en >= 45 ? 0 : (45 - p.en) / 45 * .25;
+const capOf = p => p.role === 'GK' ? 100 : 100 - 30 * clamp(G.t / G.len, 0, 1) * clamp(1 - ((p.st.stamina || 10) - 10) * .06, .5, 1.3);
+const effort = p => { const r = Math.hypot(p.vx, p.vy) / topSpeed(p); return r > .88 ? 'sprint' : r > .5 ? 'run' : 'rest'; };
+function stamRate(p, mode) {                                  // energy per second of match time
+  const k = (p.st.stamina || 10) - 10, drain = clamp(1 - k * .04, .6, 1.3);
+  return mode === 'sprint' ? -3.2 * drain : mode === 'run' ? -.35 * drain : 2.6 * clamp(1 + k * .05, .6, 1.5);
+}
 function moveTo(p, tx, ty, k = 1) {
   const dx = tx - p.x, dy = ty - p.y, d = Math.hypot(dx, dy), v = speedOf(p) * k;
   if (d < .3) { p.vx *= .8; p.vy *= .8; return; }
   const s = Math.min(v, d * 3); p.vx = lerp(p.vx, dx / d * s, .15); p.vy = lerp(p.vy, dy / d * s, .15);
 }
+// Team shape (owner, 24 Nov: "go forward when attacking, go back when defending"). Worked in metres from your own goal line (u):
+// attacking, forwards run 13 m ahead of the ball, midfielders stay level or just ahead, defenders follow up to halfway;
+// defending, everyone drops goal-side of the ball. So a forward pass is usually on, and the team never leaves its goal open.
 function shiftHome(p) {
-  const b = G.ball, side = p.team === 0 ? 1 : -1, att = b.owner ? (b.owner.team === p.team) : false;
-  let y = p.hy + (b.y - 52.5) * .55 + (att ? -side * 6 : side * 2) + (p.team === 0 && p.role !== 'GK' ? { att: -6, def: 6, bal: 0 }[PLAN.tactic] : 0), x = p.hx + (b.x - GX) * .35;
-  if (p.role === 'GK') { x = clamp(b.x, GX - 3, GX + 3); y = p.hy; }
-  return [clamp(x, 3, W - 3), clamp(y, 2, H - 2)];
+  const b = G.ball;
+  if (p.role === 'GK') return [clamp(b.x, GX - 3, GX + 3), p.hy];
+  const U = y => p.team === 0 ? H - y : y, ub = U(b.y), uh = U(p.hy), L = p.role, holder = b.owner || b.last, att = !!holder && holder.team === p.team;
+  let u;
+  if (att) u = L === 'FW' ? clamp(Math.max(ub + 13, uh + 4), 0, H - 13) : L === 'MF' ? clamp(Math.max(ub + 2, uh + (ub - 52.5) * .3), 0, H - 22) : clamp(ub - 22, uh, 58);
+  else u = L === 'DF' ? clamp(ub - 13, 7, uh + 20) : L === 'MF' ? clamp(ub - 6, 13, uh + 26) : clamp(ub + 1, 28, uh + 14);
+  if (p.team === 0) u += { att: 6, def: -6, bal: 0 }[PLAN.tactic] || 0;
+  const x = GX + (p.hx - GX) * (att && L !== 'DF' ? 1.15 : 1) + (b.x - GX) * .35;
+  return [clamp(x, 3, W - 3), clamp(U(u), 2, H - 2)];
 }
 function step(dt) {
   if (G.over) return;
@@ -175,13 +193,13 @@ function step(dt) {
   if (G.zone > 0 && (G.zone -= dt) <= 0) { G.zone = 0; $('zone').classList.remove('on'); }
   for (const tm of G.timers.filter(x => x.t <= G.t)) { G.timers.splice(G.timers.indexOf(tm), 1); tm.fn(); }
   if (G.t >= G.len && !b.shot && !G.goalAnim && !G.paused) return finish();
+  if (!G.half && G.t >= G.len / 2 && !b.shot && !G.goalAnim && !G.paused && !G.cutting && !G.want) return halfTime();
   if (b.owner && b.owner.team === 0) G.ctrl = b.owner;
   else if (!G.oneTwo) { const near = G.P.filter(q => q.team === 0 && q.role !== 'GK').sort((a, c) => dist(a, b) - dist(c, b))[0]; if ((dist(near, b) < dist(G.ctrl, b) - 3 && !(G.ctrlLock > G.t)) || G.ctrl.role === 'GK') G.ctrl = near; }
   AI.assignJobs();
   for (const p of G.P) {
     p.trail.push([p.x, p.y]); if (p.trail.length > 8) p.trail.shift(); p.ghost = Math.max(0, p.ghost - dt);
-    { const stam = p.st.stamina || 10, fast = Math.hypot(p.vx, p.vy) > 6; p.rec = !fast;
-      p.en = clamp(p.en + dt * (fast ? -1.7 * (1 - (stam - 10) * .04) : 2.3 * (1 + (stam - 10) * .05)), 0, 100); }
+    p.eff = effort(p); p.en = clamp(p.en + dt * stamRate(p, p.eff), 0, capOf(p));
     if (p.dash) { if (G.t < p.dash.until) { p.vx = p.dash.vx; p.vy = p.dash.vy; continue; } p.dash = null; }
     if (p.runTo && G.t < p.runTo.until && p !== G.ctrl && p.stun <= 0) { moveTo(p, p.runTo.x, p.runTo.y, 1.1); continue; }
     if (p.stun > 0) { p.stun -= dt; p.vx *= .9; p.vy *= .9; continue; }
@@ -207,7 +225,7 @@ function step(dt) {
   G.parts = G.parts.filter(q => q.life > 0);
   for (const q of G.pops) q.t += dt; G.pops = G.pops.filter(q => q.t < 1.3);
   G.shake = Math.max(0, G.shake - dt);
-  if (AUD) for (const p of G.P) { p.ax = p.x; p.ay = p.y; }
+  if (AUD) { for (const p of G.P) { p.ax = p.x; p.ay = p.y; } G.heroMin = Math.min(G.heroMin ?? 100, G.hero.en); }
 }
 function ctrlMove(p) {
   const b = G.ball;
@@ -216,9 +234,9 @@ function ctrlMove(p) {
   if (b.owner === p) {                                       // the carrier runs at goal by itself, weaving away from the nearest defender
     const th = foes(p).filter(q => q.role !== 'GK' && q.y < p.y).sort((a, c) => dist(a, p) - dist(c, p))[0];
     const side = th && dist(th, p) < 8 ? (th.x < p.x ? 1 : -1) * 3 : 0;
-    moveTo(p, clamp(lerp(p.x, GX, p.y < 22 ? .6 : .3) + side, 6, W - 6), Math.max(6, p.y - 10), .85);
+    moveTo(p, clamp(lerp(p.x, GX, p.y < 22 ? .6 : .3) + side, 6, W - 6), Math.max(6, p.y - 10), p.en < 35 ? .55 : .85);   // tired: he walks it and gets his breath back
   } else if (!b.owner || b.owner.team === 1) moveTo(p, b.x + (b.owner ? 0 : b.vx * .3), b.y + (b.owner ? 1.2 : b.vy * .3), G.since > G.nextForce ? 1.15 : .95);
-  else { const [x, y] = shiftHome(p); moveTo(p, x, y, .7); }
+  else { const [x, y] = shiftHome(p); moveTo(p, x, y, p.en < 50 ? .5 : .75); }
 }
 function keeper(p) {
   const b = G.ball, home = p.team === 0 ? H - 1.6 : 1.6;
@@ -373,7 +391,7 @@ function passLongTo(p, tx0, ty0, runner) {                   // lofted ball over
   const tx = clamp(tx0 + Math.cos(a) * off, 2, W - 2), ty = clamp(ty0 + Math.sin(a) * off, 3, H - 3);
   atFeet(b, p, tx, ty); const d = Math.hypot(tx - b.x, ty - b.y) || 1, sp = clamp(14 + d * .3, 16, 28), T = d / sp;
   b.owner = null; b.vx = (tx - b.x) / d * sp; b.vy = (ty - b.y) / d * sp; b.vz = 9.8 * T / 2; b.z = .3; b.air = true;
-  b.noPick = p; b.noPickT = .4; b.last = p; b.rolls = null; if (runner) runner.runTo = { x: tx, y: ty, until: G.t + T + 1 };
+  b.noPick = p; b.noPickT = .4; b.last = p; b.rolls = null; audDir(p, ty); if (runner) runner.runTo = { x: tx, y: ty, until: G.t + T + 1 };
   p.en = Math.max(0, p.en - 4); G.lastPasser = p; snd('kick');
   pop(p.x, p.y - 2, ok ? 'LONG BALL!' : 'OVERHIT...', ok ? '#8fd8ff' : '#ddd');
 }
@@ -382,12 +400,18 @@ function passCut(p, mate) {                                   // a lost pass in 
   passPoint(p, f.x, f.y); G.ball.rolls = new Map(); pop(f.x, f.y - 2, 'READ IT!', '#ff6b6b');
 }
 function laneD(q, a, b) { const vx = b.x - a.x, vy = b.y - a.y, L = vx * vx + vy * vy || 1, t = clamp(((q.x - a.x) * vx + (q.y - a.y) * vy) / L, 0, 1); return Math.hypot(q.x - a.x - t * vx, q.y - a.y - t * vy); }
+const audDir = (p, ty) => { if (!AUD || p.role === 'GK') return; const g = p.team === 0 ? p.y - ty : ty - p.y; audN(`pass${p.team}_${g > 2 ? 'fwd' : g < -2 ? 'back' : 'flat'}`); };
 const dash = (p, vx, vy, sec) => { p.dash = { vx, vy, until: G.t + sec }; };
 // a TV cut: a short fade to black hides a re-position (restarts, kickoff, set pieces), so nobody ever jumps across the pitch in view
 function cut(fn, ms = 480, keepPaused) {
   audN('cut'); const d = ms / FAST; G.fade = { t0: performance.now(), d }; G.paused = true; G.cutting = true; steer = null; touch = null;
   setTimeout(() => { if (G && !G.over) { fn(); G.afterCut = true; } }, d * .45);
   setTimeout(() => { if (!G) return; G.cutting = false; if (!keepPaused && !G.over && !G.plan) G.paused = false; }, d);
+}
+function halfTime() {                                        // the second half starts with their kickoff; everyone gets some breath back
+  G.half = true; audN('halftime'); snd('whistle'); banner('HALF-TIME', 'small'); G.ball.vx = G.ball.vy = 0;
+  cut(() => { for (const p of G.P) { p.en = Math.min(capOf(p), p.en + 25); p.runTo = null; p.dash = null; p.wind = null; } kickoff(1); }, 1400);
+  later(.4, () => setHint('Half-time: everyone got their breath back (⚡+25). Their kickoff.', 3500));
 }
 // a pass into space: the chance is shown first (lane x accuracy x who gets there first); then rolled for real
 function spaceChance(p, tx, ty) {
@@ -582,13 +606,17 @@ function hud() {
     $('pls').textContent = p.role === 'GK' ? `CATCH ${Math.round(p.st.catch)}` : STAT_ABBR.map(([k, a]) => `${a} ${Math.round(p.st[k] || 10)}`).join(' · ');
     const e = Math.round(p.en), bar = $('ple').firstElementChild;
     bar.style.width = e + '%'; bar.style.background = e > 60 ? '#6dff8f' : e > 35 ? '#ffd23f' : '#ff6b5b';
-    const r = $('plr'), rate = p.rec ? `▲ recovering +${(2.3 * (1 + ((p.st.stamina || 10) - 10) * .05)).toFixed(1)}/s` : `▼ sprinting −${(1.7 * (1 - ((p.st.stamina || 10) - 10) * .04)).toFixed(1)}/s`;
-    r.textContent = `⚡ ${e}  ${rate}${e < 40 ? ' · TIRED' : ''}`; r.style.color = p.rec ? '#9dffb0' : '#ffb38a';
+    const cap = Math.round(capOf(p)), mode = p.eff || 'rest', rr = Math.abs(stamRate(p, mode)).toFixed(1);
+    $('ple').style.background = `linear-gradient(to right, #ffffff22 ${cap}%, #ff5a4a66 ${cap}%)`;   // the red end = energy you can't get back any more
+    const rate = mode === 'sprint' ? `▼ SPRINT −${rr}/s` : mode === 'run' ? `▼ running −${rr}/s` : e >= cap - 1 ? `● full (max ${cap})` : `▲ resting +${rr}/s`;
+    const r = $('plr'); r.textContent = `⚡ ${e}  ${rate}${e < 45 ? ' · TIRED' : ''}`; r.style.color = mode === 'sprint' ? '#ff9b7a' : mode === 'run' ? '#ffe08a' : '#9dffb0';
+    if (p === G.hero && e < 35 && !G.tiredSeen && free) { G.tiredSeen = true; setHint(`${p.name} is tired: slower and weaker. Let go of the stick to walk and rest, or pass.`, 4500); }
     const pb = $('bPlan'); pb.classList.toggle('on', (free || G.plan) && !G.over); pb.firstChild.textContent = G.plan ? '▶ PLAY' : '⏸ PLAN';
     const ours = free && b.owner === p && p.team === 0;
-    G.tg = ours ? { s: shortTarget(p), l: longTarget(p) } : null;
+    G.tg = ours ? { s: stickyTarget('s', fwdFirst(p, AI.rankPass(p, 'pass')), now), l: stickyTarget('l', AI.rankPass(p, 'long'), now) } : null;
+    const sp = G.tg && G.tg.s && (G.tgSel.sObj || {}).p;
     setBtn('bShoot', ours && distToGoal(p) < 34 && angleOk(p), `${Math.round(clamp(shotChance(p, keeperOf(1), false) - tiredPen(p), .03, .8) * 100)}%`);
-    setBtn('bPass', ours && !!G.tg.s, G.tg && G.tg.s ? `→ ${G.tg.s.name}` : '');
+    setBtn('bPass', ours && !!G.tg.s, G.tg && G.tg.s ? `→ ${G.tg.s.name}${sp ? ` ${Math.round(sp * 100)}%` : ''}` : '');
     setBtn('bLong', ours && !!G.tg.l, G.tg && G.tg.l ? `${G.tg.l.name} ${Math.round(longChance(p) * 100)}%` : '');
     const car = b.owner, near = free && car && car.team === 1 && p.team === 0 && p.role !== 'GK' && p.stun <= 0 && dist(p, car) < 7;
     setBtn('bTackle', near, near ? `${Math.round(clamp(chance(p.st.tackle, car.st.dribble) - (dist(p, car) > 1.6 ? .1 : 0) - tiredPen(p) + tiredPen(car), .05, .9) * 100)}%${dist(p, car) > 3.2 ? ' · closer!' : ''}` : '', near && dist(p, car) > 3.2);
@@ -600,16 +628,28 @@ function hud() {
   const wins = Math.ceil((cost - G.sp) / spGain());
   $('spt').textContent = ready ? 'SPECIAL READY!' : wins <= 1 ? '1 more win → SPECIAL' : `${wins} wins → SPECIAL`;
 }
+// the PASS / LONG target must not flicker between players while you decide: keep it for at least 0.9 s unless another is clearly better
+function stickyTarget(k, list, now) {
+  const sel = (G.tgSel = G.tgSel || {}), cur = sel[k], top = list[0]; if (!top) { sel[k] = null; return null; }
+  const c = cur && list.find(o => o.q === cur.q);
+  if (c && (now - cur.t < 900 || top.v - c.v < .08)) { sel[k + 'Obj'] = c; return c.q; }
+  sel[k] = { q: top.q, t: now }; sel[k + 'Obj'] = top; return top.q;
+}
+// PASS goes forward whenever a forward pass has a fair chance (55%+); otherwise the safest good option (owner, 24 Nov)
+function fwdFirst(p, list) {
+  const gain = o => p.y - o.q.y, f = list.filter(o => gain(o) > 2 && o.p >= .55);
+  return f.length ? [...f, ...list.filter(o => !f.includes(o))].map((o, i) => i ? o : { ...o, v: Math.max(o.v, list[0].v) }) : list;
+}
 const spGain = () => 9 * (1 + (save.stats.spirit - 10) * .04);
 
 const armed = id => G && !G.paused && performance.now() - ($(id).onAt || 0) > 350 && G.t - (G.ownT || 0) > .3 * FAST;
 $('bShoot').onclick = () => { const p = G && G.ctrl; if (p && G.ball.owner === p && armed('bShoot')) { shootNow(p); G.stat.free++; } };
-$('bPass').onclick = () => { const p = G && G.ctrl; if (p && G.ball.owner === p && armed('bPass')) { const t = shortTarget(p); if (t) { pass(p, t); p.en = Math.max(0, p.en - 2); } } };
-$('bLong').onclick = () => { const p = G && G.ctrl; if (p && G.ball.owner === p && armed('bLong')) { const t = longTarget(p); if (t) passLong(p, t); } };
+$('bPass').onclick = () => { const p = G && G.ctrl; if (p && G.ball.owner === p && armed('bPass')) { const t = G.tg && G.tg.s; if (t) { pass(p, t); p.en = Math.max(0, p.en - 2); } } };
+$('bLong').onclick = () => { const p = G && G.ctrl; if (p && G.ball.owner === p && armed('bLong')) { const t = G.tg && G.tg.l; if (t) passLong(p, t); } };
 $('bTackle').onclick = () => { const p = G && G.ctrl; if (p && armed('bTackle')) tackleNow(p); };
 let last = 0;
 function loop(now) {
-  const dt = Math.min(.05, (now - last) / 1000 || 0) * FAST; last = now;
+  const dt = Math.min(.05, (now - last) / 1000 || 0) * FAST * PACE; last = now;
   if (G) { if (!G.paused) { step(dt); if (BOT) botFree(dt); } draw(); }
   requestAnimationFrame(loop);
 }
