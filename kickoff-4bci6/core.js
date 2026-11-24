@@ -92,10 +92,11 @@ const buzz = ms => { try { navigator.vibrate && navigator.vibrate(ms); } catch (
 
 // ---------------------------------------------------------------- save
 const KEY = 'ss.stage1.v1';
-const BASE = { shoot: 10, dribble: 10, pass: 10, tackle: 10, speed: 10, spirit: 10 };
-const fresh = () => ({ match: 1, lvl: 1, xp: 0, stats: { ...BASE }, style: null, name: 'KAI', rec: [], seenCut: 0, plays: 0, fb: false, done: false });
+const BASE = { shoot: 10, dribble: 10, pass: 10, tackle: 10, speed: 10, stamina: 10, spirit: 10 };
+const fresh = () => ({ match: 1, lvl: 1, xp: 0, stats: { ...BASE }, tp: 0, style: null, name: 'KAI', rec: [], seenCut: 0, plays: 0, fb: false, done: false });
 let save; try { save = JSON.parse(localStorage.getItem(KEY)); } catch (e) {}
 save = save && save.stats ? save : fresh();
+save.stats = { ...BASE, ...save.stats }; save.tp = save.tp || 0;      // older saves: add STAMINA and the training-point bank
 const store = () => { try { localStorage.setItem(KEY, JSON.stringify(save)); } catch (e) {} };
 const need = lvl => 100 + 40 * (lvl - 1);
 

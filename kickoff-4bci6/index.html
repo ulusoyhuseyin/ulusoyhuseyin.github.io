@@ -148,6 +148,35 @@
   .card .row { display: flex; gap: 6px; margin-top: 4px; }
   .card .row .btn { font-size: 18px; padding: 7px 12px; flex: 1; }
   .card.sel { border-color: var(--gold); }
+  /* training screen: one row per stat, + buttons spend points (owner, 24 Nov) */
+  #train { justify-content: flex-start; padding-top: calc(16px + env(safe-area-inset-top)); gap: 8px; }
+  .tphead { display: flex; align-items: center; gap: 10px; width: min(100%, 520px); }
+  .tphead img { width: 54px; height: 54px; border-radius: 50%; border: 3px solid var(--red); object-fit: cover; }
+  .tphead .pts { margin-left: auto; font-family: Bangers, sans-serif; font-size: 22px; letter-spacing: 1px; color: #000; background: var(--gold); border-radius: 12px; padding: 4px 12px; white-space: nowrap; }
+  .tphead .pts.zero { background: #2b3a4c; color: #fff; }
+  .tnext { display: flex; gap: 10px; align-items: center; width: min(100%, 520px); background: #2a1620; border: 2px solid #ff5a4a55; border-radius: 12px; padding: 8px 10px; text-align: left; }
+  .tnext img { width: 58px; height: 58px; border-radius: 50%; border: 3px solid #aab; object-fit: cover; flex: none; }
+  .tnext span { display: block; }
+  .tnext .lab { font-family: Bangers, sans-serif; letter-spacing: 1px; font-size: 15px; color: #ff9b7a; }
+  .tnext .say { font-size: 14px; line-height: 1.3; }
+  .tnext .tip { font-size: 12px; opacity: .75; margin-top: 3px; }
+  .trows { display: flex; flex-direction: column; gap: 6px; width: min(100%, 520px); }
+  .trow { display: grid; grid-template-columns: 30px 1fr auto; align-items: center; gap: 4px 10px; background: #10202e; border: 2px solid #ffffff1a; border-radius: 12px; padding: 7px 8px 7px 10px; }
+  .trow.lean { border-color: #ffd23f55; }
+  .trow .ic { font-size: 22px; grid-row: 1 / span 2; grid-column: 1; text-align: center; }
+  .trow .nm { grid-row: 1; grid-column: 2; font-family: Bangers, sans-serif; letter-spacing: 1px; font-size: 19px; display: flex; align-items: center; gap: 8px; }
+  .trow .nm b { font-size: 22px; color: var(--gold); min-width: 26px; }
+  .trow .nm .up { color: #6dff8f; font-size: 15px; }
+  .trow .ds { font-size: 12px; opacity: .75; grid-row: 2; grid-column: 2; text-align: left; }
+  .trow .bar { height: 6px; background: #ffffff1a; border-radius: 3px; overflow: hidden; flex: 1; }
+  .trow .bar i { display: block; height: 100%; background: var(--gold); }
+  .trow .bar i.new { background: #6dff8f; }
+  .trow .plus { grid-row: 1 / span 2; grid-column: 3; font-family: Bangers, sans-serif; font-size: 26px; width: 58px; height: 50px; border: 0; border-radius: 12px; background: var(--gold); color: #000; box-shadow: 0 3px 0 #8a6a00; line-height: .9; }
+  .trow .plus small { display: block; font-size: 11px; letter-spacing: .5px; }
+  .trow .plus:disabled { background: #2b3a4c; color: #fff8; box-shadow: none; }
+  .tfoot { display: flex; gap: 8px; flex-wrap: wrap; justify-content: center; align-items: center; margin-top: 4px; }
+  #train:not(.tdrill) .tfoot { position: sticky; bottom: calc(-20px - env(safe-area-inset-bottom)); width: calc(100% + 32px); margin: 0 -16px; padding: 12px 16px calc(14px + env(safe-area-inset-bottom)); background: linear-gradient(transparent, #071209 30%); z-index: 1; }
+  .tdrill { justify-content: flex-start !important; padding-top: calc(60px + env(safe-area-inset-top)) !important; }
   .face-big { width: 120px; height: 120px; border-radius: 50%; border: 4px solid var(--ice); object-fit: cover; box-shadow: 0 5px 0 #000; }
   .bubble { background: #fff; color: #111; border-radius: 16px; padding: 12px 16px; max-width: 400px; font-size: 17px; line-height: 1.4; position: relative; box-shadow: 0 4px 0 #000; text-align: left; min-height: 3em; }
   .bubble b { font-family: Bangers, sans-serif; letter-spacing: 1px; color: #1b6b3a; display: block; font-size: 18px; }
@@ -186,6 +215,7 @@
   <p class="bang" style="font-size:22px;color:#8fd8ff;letter-spacing:1px">FIRST SEASON · PREVIEW</p>
   <img class="face-big" src="img/face_kai.jpg" alt="" style="border-color:var(--red)">
   <button class="btn" id="play">KICK OFF</button>
+  <button class="btn alt" id="trainBtn" style="display:none"></button>
   <p class="small" id="tsub"></p>
   <div id="consentBox"></div>
   <button class="link" id="reset">start a new season</button>

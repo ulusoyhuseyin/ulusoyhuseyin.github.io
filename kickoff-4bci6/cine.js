@@ -280,3 +280,56 @@ async function techRen(name, skippable) {
     moveName(c, name + '!', 1, CW / 2, CH * (portrait ? .12 : .13), Math.min(CW * .13, CH * .12, 80), ice);
   }, skippable);
 }
+
+// ---------------------------------------------------------------- a rival star's special shot without drawn art (owner, 24 Nov: Dax's THUNDER HAMMER)
+// The star appears as their pitch token (shirt number in the team colour) with focus lines; then the kick, a lightning
+// ('zig') or curling ('curl') trail flying at your goal, and the move name. About 2 s; tap to skip from the second time.
+function bigBadge(c, x, y, r, col, num, name) {
+  c.save(); c.fillStyle = '#000'; c.beginPath(); c.arc(x, y, r + 6, 0, 7); c.fill();
+  c.fillStyle = col; c.beginPath(); c.arc(x, y, r, 0, 7); c.fill();
+  c.fillStyle = 'rgba(255,255,255,.18)'; c.beginPath(); c.arc(x, y + r * .9, r * .84, 0, 7); c.save(); c.clip(); c.beginPath(); c.arc(x, y, r, 0, 7); c.fill(); c.restore();
+  c.font = `${r * 1.05}px Bangers, Impact, sans-serif`; c.textAlign = 'center'; c.textBaseline = 'middle'; c.lineJoin = 'round';
+  c.lineWidth = r * .12; c.strokeStyle = 'rgba(0,0,0,.7)'; c.strokeText(num, x, y + r * .05); c.fillStyle = '#fff'; c.fillText(num, x, y + r * .05);
+  c.font = `${r * .42}px Bangers, Impact, sans-serif`; c.lineWidth = r * .1; c.strokeStyle = '#000'; c.strokeText('★ ' + name, x, y + r * 1.45); c.fillStyle = '#ffb36b'; c.fillText('★ ' + name, x, y + r * 1.45);
+  c.restore();
+}
+async function techStar(name, p, cols, kind, skippable) {
+  const col = (G && G.opp && G.opp.col) || '#5d6773', num = String(p.num), who = p.name.toUpperCase();
+  const zig = Array.from({ length: 14 }, (_, i) => i && i < 13 ? rnd(-1, 1) : 0);
+  snd('swoosh'); let boomed = false;
+  await cine(2.1, (c, t, ts) => {
+    const portrait = CH > CW, R = Math.min(CW, CH) * (portrait ? .2 : .17);
+    cineBg(c, [.5, .5], 'rgba(10,6,0,.55)');
+    if (t < .42) {                                            // the star, close up: slides in, focus lines, eyes flash
+      const k = t / .42, sx = CW / 2 + (1 - easeOut(Math.min(1, k / .3))) * CW, sy = CH * .45, sc = 1 + k * .12;
+      c.globalCompositeOperation = 'lighter'; focusLines(c, CW / 2, sy, 50, R * 1.3, cols[1], .35); c.globalCompositeOperation = 'source-over';
+      bigBadge(c, sx, sy, R * sc, col, num, who);
+      if (k > .55) { c.globalCompositeOperation = 'lighter';
+        for (const ex of [-.32, .32]) { const g = c.createRadialGradient(sx + ex * R, sy - R * .55, 0, sx + ex * R, sy - R * .55, R * .3); g.addColorStop(0, cols[0]); g.addColorStop(1, 'rgba(0,0,0,0)'); c.fillStyle = g; c.beginPath(); c.arc(sx + ex * R, sy - R * .55, R * .3, 0, 7); c.fill(); }
+        c.globalCompositeOperation = 'source-over'; }
+      return;
+    }
+    if (t < .5) { const inv = t > .46; c.fillStyle = inv ? '#fff' : '#000'; c.fillRect(0, 0, CW, CH);       // impact frames
+      c.fillStyle = inv ? '#000' : '#fff'; c.beginPath(); c.arc(CW * .72, CH * .62, R * .8, 0, 7); c.fill();
+      if (!boomed) { boomed = true; snd('boom'); buzz(70); } return; }
+    const k = (t - .5) / .5, sh = k < .1 ? (1 - k / .1) * 16 : 0, fx0 = CW * .72, fy0 = CH * .62;
+    c.save(); c.translate(rnd(-sh, sh), rnd(-sh, sh));
+    speedLines(c, -60, 0, CW + 120, CH, 70, cols[0], ts * 2.4, -1);
+    bigBadge(c, fx0 + R * .4, fy0 + R * .2, R * .62, col, num, who);
+    const kk = ease(clamp(k / .8, 0, 1)), ex = CW * .1, ey = CH * (portrait ? .3 : .25), br = R * .22;
+    const at = u => kind === 'zig'
+      ? [lerp(fx0, ex, u) + zig[Math.floor(u * 13)] * R * .35 * Math.sin(u * Math.PI), lerp(fy0, ey, u) + zig[Math.ceil(u * 13)] * R * .25]
+      : [lerp(fx0, ex, u) + Math.sin(u * Math.PI) * -R * 1.4, lerp(fy0, ey, u) - Math.sin(u * Math.PI) * R * 1.1];
+    c.globalCompositeOperation = 'lighter'; c.lineCap = 'round'; c.lineJoin = 'round';
+    for (const [w, a, cc] of [[2.6, .3, cols[2] === '#5a3a00' ? '#ff9b00' : cols[1]], [1.5, .6, cols[1]], [.6, .95, cols[0]]]) {
+      c.strokeStyle = cc; c.globalAlpha = a; c.lineWidth = br * w; c.beginPath();
+      for (let j = 0; j <= 26; j++) { const [x, y] = at(j / 26 * kk); j ? c.lineTo(x, y) : c.moveTo(x, y); } c.stroke();
+    }
+    c.globalAlpha = 1; c.globalCompositeOperation = 'source-over';
+    const [bx, by] = at(kk); ballArt(c, bx, by, br, k < .08 ? .6 : 1, -ts * 40);
+    c.restore();
+    moveName(c, name + '!', k, CW / 2, CH * (portrait ? .13 : .14), Math.min(CW * .13, CH * .12, 80), cols);
+    if (k > .9) { c.fillStyle = `rgba(255,250,220,${(k - .9) * 8})`; c.fillRect(0, 0, CW, CH); }
+    if (skippable && k < .9) { c.font = '13px system-ui'; c.fillStyle = 'rgba(255,255,255,.6)'; c.textAlign = 'right'; c.fillText('tap to skip', CW - 12, CH - 16); }
+  }, skippable);
+}

@@ -18,17 +18,19 @@ const OPPS = [
       ['MF1', 'Taro', 6, { pass: 11, tackle: 10.5 }], ['MF2', 'Lio', 8, { pass: 11.5, dribble: 10.5 }], ['MF3', 'Remy', 7, { pass: 10.5, tackle: 11 }],
       ['FW1', 'Haru', 11, { shoot: 11, dribble: 10.5, speed: 11 }], ['FW2', 'Ren', 10, { shoot: 14, dribble: 14, pass: 11, speed: 12, stamina: 13 }, 'ren'], ['FW3', 'Max', 9, { shoot: 10.5, dribble: 10 }]] },
 ];
-// rival specials used against the player (DESIGN §4): Ren's shot, Bruno's block. Twice a match each at most.
-const RIVAL_SP = { Ren: { name: 'FROST SPIRAL', face: 'ren', cols: ['#e8fbff', '#7fd8ff', '#0b2f4a'], pen: .15 }, Bruno: { name: 'IRON WALL', face: 'bruno', cols: ['#f2f4f8', '#9aa7b5', '#2b333d'] } };
+// rival specials used against the player (DESIGN §4): Ren's shot, Bruno's block, Dax's shot (owner, 24 Nov: match 2 needs a special shot too).
+// Twice a match each at most. Match 1 has none on purpose: it's the easy first match.
+const RIVAL_SP = { Ren: { name: 'FROST SPIRAL', face: 'ren', cols: ['#e8fbff', '#7fd8ff', '#0b2f4a'], pen: .15 },
+  Dax: { name: 'THUNDER HAMMER', cols: ['#fffbe0', '#ffd23f', '#5a3a00'], pen: .1, anim: 'zig' }, Bruno: { name: 'IRON WALL', face: 'bruno', cols: ['#f2f4f8', '#9aa7b5', '#2b333d'] } };
 async function rivalShot(car, final) {                       // their shot at your goal; a rival may unleash a special first
   const rs = RIVAL_SP[car.name], used = (G.rivalUsed = G.rivalUsed || {});
   if (rs && rs.pen && (used[car.name] || 0) < 2 && car.en >= 25 && (final || Math.random() < .7)) {   // rivals pay energy for specials too
-    used[car.name] = (used[car.name] || 0) + 1; G.paused = true; car.en = Math.max(0, car.en - 25);
-    if (car.name === 'Ren') await techRen(rs.name, (used[car.name] || 0) > 1); else await techFX(rs.name, rs.face, rs.cols, 1.5, false);
+    used[car.name] = (used[car.name] || 0) + 1; G.paused = true; car.en = Math.max(0, car.en - 25); audN('special_' + car.name);
+    if (car.name === 'Ren') await techRen(rs.name, (used[car.name] || 0) > 1); else if (rs.anim) await techStar(rs.name, car, rs.cols, rs.anim, (used[car.name] || 0) > 1); else await techFX(rs.name, rs.face, rs.cols, 1.5, false);
     if (!G || G.over) return; G.paused = false;
-    return openScene('save', { me: keeperOf(0), them: car, final, rival: rs });
+    audN('shot_by_star'); return openScene('save', { me: keeperOf(0), them: car, final, rival: rs });
   }
-  openScene('save', { me: keeperOf(0), them: car, final });
+  audN(car === G.star ? 'shot_by_star' : 'shot_by_other'); openScene('save', { me: keeperOf(0), them: car, final });
 }
 
 let G = null;
@@ -36,21 +38,24 @@ function player(team, role, name, num, st, face) {
   const [x0, y0] = FORM[role], x = team ? W - x0 : x0, y = team ? H - y0 : y0;
   return { team, role: role.slice(0, 2), slot: role, hx: x, hy: y, x, y, vx: 0, vy: 0, st, name, num, face, stun: 0, dive: 0, diveX: 0, trail: [], ghost: 0, press: false, en: 100, rec: true };
 }
+// everyone is built differently (owner, 24 Nov): forwards are quick but tire sooner, midfielders run all day
+const ROLE_FIT = (b, r) => r.startsWith('FW') ? { speed: b.speed + .5, stamina: b.stamina - 1.5 } : r.startsWith('MF') ? { stamina: b.stamina + 2 } : r.startsWith('DF') ? { speed: b.speed - .5, stamina: b.stamina + .5 } : {};
 function newMatch() {
   const m = Math.min(save.match, OPPS.length), opp = OPPS[m - 1];
   const ours = (st) => ({ shoot: 7, dribble: 8, pass: 9, tackle: 9, speed: 9.5, stamina: 10, ...st });
   const P = [
     player(0, 'GK', 'Doi', 1, { catch: 9.5 + m * .5, pass: 9 }),
-    player(0, 'DF1', 'Aki', 2, ours({ tackle: 10, speed: 10.5 })), player(0, 'DF2', 'Kemal', 4, ours({ tackle: 11 })),
-    player(0, 'DF3', 'Renzo', 5, ours({ tackle: 11, pass: 9.5 })), player(0, 'DF4', 'Tomas', 3, ours({ tackle: 9.5, speed: 11 })),
-    player(0, 'MF1', 'Yuto', 7, ours({ pass: 11, dribble: 10, shoot: 8 })), player(0, 'MF2', 'Mo', 8, ours({ shoot: 9, dribble: 10, pass: 12 + m, speed: 10 }), 'mo'),
-    player(0, 'MF3', 'Elif', 6, ours({ tackle: 10.5, pass: 10, stamina: 13 })),
-    player(0, 'FW1', 'Sami', 11, ours({ shoot: 9, dribble: 10.5, speed: 11.5 })), player(0, 'FW2', save.name, 9, save.stats, 'kai'),
-    player(0, 'FW3', 'Lukas', 10, ours({ shoot: 9.5, dribble: 9, speed: 10 })),
-    ...opp.P.map(([r, n, num, st, face]) => player(1, r, n, num, { ...opp.base, ...st }, face)),
+    player(0, 'DF1', 'Aki', 2, ours({ tackle: 10, speed: 10.5 })), player(0, 'DF2', 'Kemal', 4, ours({ tackle: 11, speed: 8.5, stamina: 12 })),
+    player(0, 'DF3', 'Renzo', 5, ours({ tackle: 11, pass: 9.5, stamina: 11 })), player(0, 'DF4', 'Tomas', 3, ours({ tackle: 9.5, speed: 11, stamina: 8.5 })),
+    player(0, 'MF1', 'Yuto', 7, ours({ pass: 11, dribble: 10, shoot: 8, stamina: 12 })), player(0, 'MF2', 'Mo', 8, ours({ shoot: 9, dribble: 10, pass: 12 + m, speed: 10, stamina: 11 }), 'mo'),
+    player(0, 'MF3', 'Elif', 6, ours({ tackle: 10.5, pass: 10, speed: 9, stamina: 14 })),
+    player(0, 'FW1', 'Sami', 11, ours({ shoot: 9, dribble: 10.5, speed: 12, stamina: 8 })), player(0, 'FW2', save.name, 9, save.stats, 'kai'),
+    player(0, 'FW3', 'Lukas', 10, ours({ shoot: 9.5, dribble: 9, speed: 10, stamina: 10.5 })),
+    ...opp.P.map(([r, n, num, st, face]) => player(1, r, n, num, { ...opp.base, ...ROLE_FIT(opp.base, r), ...st }, face)),
   ];
   const hero = P.find(p => p.team === 0 && p.slot === 'FW2'), mo = P.find(p => p.name === 'Mo');
-  G = { P, hero, mo, opp, m, ball: { x: GX, y: 52.5, z: 0, vx: 0, vy: 0, vz: 0, owner: null, last: null, noPick: null, noPickT: 0, shot: null, trail: [] },
+  const star = P.filter(p => p.team === 1 && p.role !== 'GK').sort((a, c) => (c.st.shoot || 0) - (a.st.shoot || 0))[0];   // their best shooter: fed more, marked ★
+  G = { P, hero, mo, star, opp, m, ball: { x: GX, y: 52.5, z: 0, vx: 0, vy: 0, vz: 0, owner: null, last: null, noPick: null, noPickT: 0, shot: null, trail: [] },
     score: [0, 0], t: 0, len: opp.len, paused: false, over: false, ctrl: hero, sp: 25, spMax: 100, tkCd: 0,
     cam: { x: GX, y: 48, z: 1 }, parts: [], pops: [], shake: 0, slow: 1, timers: [], bgImg: IMG[opp.bg],
     since: 0, nextForce: 9, chain: false, tut: save.match === 1 && !save.plays ? 1 : 0, fkDone: m < 2, finalDone: false,
@@ -162,9 +167,10 @@ function speedOf(p) { return topSpeed(p) * (G.ball.owner === p ? .86 : 1) * (.62
 const tiredPen = p => p.role === 'GK' || p.en >= 45 ? 0 : (45 - p.en) / 45 * .25;
 const capOf = p => p.role === 'GK' ? 100 : 100 - 30 * clamp(G.t / G.len, 0, 1) * clamp(1 - ((p.st.stamina || 10) - 10) * .06, .5, 1.3);
 const effort = p => { const r = Math.hypot(p.vx, p.vy) / topSpeed(p); return r > .88 ? 'sprint' : r > .5 ? 'run' : 'rest'; };
+const sprintCost = p => clamp(1 + ((p.st.speed || 10) - 10) * .04, .8, 1.5);   // a faster sprint burns more: SPEED and STAMINA pull against each other
 function stamRate(p, mode) {                                  // energy per second of match time
-  const k = (p.st.stamina || 10) - 10, drain = clamp(1 - k * .04, .6, 1.3);
-  return mode === 'sprint' ? -3.2 * drain : mode === 'run' ? -.35 * drain : 2.6 * clamp(1 + k * .05, .6, 1.5);
+  const k = (p.st.stamina || 10) - 10, drain = clamp(1 - k * .04, .55, 1.3);
+  return mode === 'sprint' ? -3.2 * drain * sprintCost(p) : mode === 'run' ? -.35 * drain : 2.6 * clamp(1 + k * .05, .6, 1.5);
 }
 function moveTo(p, tx, ty, k = 1) {
   const dx = tx - p.x, dy = ty - p.y, d = Math.hypot(dx, dy), v = speedOf(p) * k;
@@ -497,7 +503,7 @@ function finalScene() {
       G.hero.x = GX + rnd(-6, 6); G.hero.y = 19; own(G.hero); G.ctrl = G.hero; G.sp = Math.max(G.sp, specCost()); banner('LAST CHANCE!', 'small'); }, 700, true);
     setTimeout(() => { if (G && !G.over) { G.paused = false; openScene('shot', { me: G.hero, them: keeperOf(1), final: true }); } }, 1300 / FAST);
   } else {                                                    // HOLD THE LEAD: their striker breaks through
-    const fw = G.P.find(p => p.team === 1 && p.role === 'FW');
+    const fw = G.star && G.star.role === 'FW' ? G.star : G.P.find(p => p.team === 1 && p.role === 'FW');   // their star gets the breakaway
     cut(() => { fw.x = GX + rnd(-6, 6); fw.y = H - 21; own(fw);
       for (const q of G.P) if (q.team === 0 && q.role !== 'GK') q.y = Math.min(H - 12, Math.max(q.y, H - 34)); banner('HOLD THE LEAD!', 'small'); }, 700, true);
     setTimeout(() => { if (G && !G.over) { G.paused = false; rivalShot(fw, true); } }, 1300 / FAST);
@@ -553,9 +559,9 @@ function draw() {
     c.save(); upright(c, p.x + dx, p.y); c.translate(0, -bob); if (p.dive > .2) c.rotate((p.diveX - p.x > 0 ? 1 : -1) * p.dive * .9);
     c.drawImage(tk, -r, -r, r * 2, r * 2); c.restore();
     c.save(); upright(c, p.x, p.y);
-    if (p.face || p === G.ctrl) {
+    if (p.face || p === G.ctrl || p === G.star) {
       c.font = `${p === G.hero ? 1.15 : .95}px Bangers, sans-serif`; c.textAlign = 'center'; c.fillStyle = p.team === 0 ? '#fff' : '#dfe8ff'; c.strokeStyle = '#000'; c.lineWidth = .25;
-      const nm = p.name.toUpperCase(); c.strokeText(nm, 0, -r - .5); c.fillText(nm, 0, -r - .5);
+      const nm = (p === G.star ? '★ ' : '') + p.name.toUpperCase(); if (p === G.star) c.fillStyle = '#ffb36b'; c.strokeText(nm, 0, -r - .5); c.fillText(nm, 0, -r - .5);
     }
     if (p.wind) { const u = clamp(1 - (p.wind.t - G.t) / .65, 0, 1); c.strokeStyle = '#ff3b3b'; c.lineWidth = .28; c.beginPath(); c.arc(0, 0, r + 2.2 - 1.6 * u, 0, 7); c.stroke();
       const t = `⚠ TACKLE ${Math.round(p.wind.ch * 100)}%`; c.font = '1.25px Bangers, sans-serif'; c.textAlign = 'center'; const tw = c.measureText(t).width + .8, ty = -r - 2.6;
@@ -591,7 +597,7 @@ function draw() {
   if (G.fade) { const u = (performance.now() - G.fade.t0) / G.fade.d; if (u >= 1) G.fade = null; else { c.setTransform(DPR, 0, 0, DPR, 0, 0); c.fillStyle = `rgba(4,10,20,${u < .45 ? u / .45 : 1 - (u - .45) / .55})`; c.fillRect(0, 0, CW, CH); } }
   hud();
 }
-const STAT_ABBR = [['shoot', 'SHT'], ['dribble', 'DRI'], ['pass', 'PAS'], ['tackle', 'TKL'], ['stamina', 'STA']];
+const STAT_ABBR = [['shoot', 'SHT'], ['dribble', 'DRI'], ['pass', 'PAS'], ['tackle', 'TKL'], ['speed', 'SPD'], ['stamina', 'STA']];
 let hudT = 0;
 function setBtn(id, show, label, far) { const b = $(id); if (show && !b.classList.contains('on')) b.onAt = performance.now(); b.classList.toggle('on', show); if (show) { b.classList.toggle('far', !!far); const sm = b.firstElementChild; if (sm.textContent !== label) sm.textContent = label; } }
 function hud() {
@@ -603,7 +609,7 @@ function hud() {
     const f = $('plf');
     if (f.dataset.who !== p.name) { f.dataset.who = p.name; f.style.backgroundImage = p.face ? `url(img/face_${p.face}.jpg)` : 'none'; f.textContent = p.face ? '' : p.num; f.style.backgroundColor = p.face ? '#333' : '#e23b3b'; }
     $('pln').textContent = p.name.toUpperCase();
-    $('pls').textContent = p.role === 'GK' ? `CATCH ${Math.round(p.st.catch)}` : STAT_ABBR.map(([k, a]) => `${a} ${Math.round(p.st[k] || 10)}`).join(' · ');
+    $('pls').textContent = p.role === 'GK' ? `CATCH ${Math.round(p.st.catch)}` : STAT_ABBR.map(([k, a]) => `${a} ${Math.round(p.st[k] || 10)}`).join(' ');
     const e = Math.round(p.en), bar = $('ple').firstElementChild;
     bar.style.width = e + '%'; bar.style.background = e > 60 ? '#6dff8f' : e > 35 ? '#ffd23f' : '#ff6b5b';
     const cap = Math.round(capOf(p)), mode = p.eff || 'rest', rr = Math.abs(stamRate(p, mode)).toFixed(1);

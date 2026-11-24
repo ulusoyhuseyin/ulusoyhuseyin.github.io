@@ -63,7 +63,8 @@ const AI = (() => {
       const d = dist(p, q); if (d < 4 || d > 50) continue;
       const lofted = d > 24, lx = q.x + q.vx * .5, ly = q.y + q.vy * .5, ps = passSuccess(p, lx, ly, lofted);
       const fwd = .45 * (prog(team, ly) - prog(team, p.y));   // football goes forward: a pass that gains ground is worth more, a back pass less
-      out.push({ kind: lofted ? 'long' : 'pass', q, p: ps, v: ps * holdValue(q, lx, ly) - (1 - ps) * lossCost(team, (p.y + ly) / 2) - (lofted ? .03 : 0) + fwd });
+      const feed = team === 1 && q === G.star ? .15 : 0;      // their team looks for its star (owner, 24 Nov)
+      out.push({ kind: lofted ? 'long' : 'pass', q, p: ps, v: ps * holdValue(q, lx, ly) - (1 - ps) * lossCost(team, (p.y + ly) / 2) - (lofted ? .03 : 0) + fwd + feed });
     }
     const x = xg(p, p.x, p.y); if (x > 0) out.push({ kind: 'shoot', p: x, v: x * 2.2 + (1 - x) * .1 });
     out.push({ kind: 'hold', p: 1, v: holdValue(p, p.x, p.y) - .05 });
@@ -89,7 +90,8 @@ const AI = (() => {
     else { p.vx *= .85; p.vy *= .85; }
   }
   function supportSpot(p, car) {                              // the best nearby spot to receive: forward, open, with a clear lane
-    const [hx, hy] = shiftHome(p); let best = [hx, hy], bv = -1e9;
+    let [hx, hy] = shiftHome(p); if (p === G.star && p.team === 1) hy = Math.min(H - 8, hy + 4);   // the star runs further, into the box
+    let best = [hx, hy], bv = -1e9;
     for (let i = 0; i < 9; i++) {
       const a = i * .785, r = i === 8 ? 0 : 6, x = clamp(hx + Math.cos(a) * r, 3, W - 3), y = clamp(hy + Math.sin(a) * r, 3, H - 3);
       const v = posValue(p.team, x, y) * .8 + passSuccess(car, x, y, Math.hypot(x - car.x, y - car.y) > 24) * .6 - pressure(p.team, x, y) * .25;
