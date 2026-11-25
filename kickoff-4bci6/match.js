@@ -68,11 +68,11 @@ function kickoff(team) {
   for (const p of G.P) { p.x = p.hx; p.y = p.hy; p.vx = p.vy = 0; p.stun = 0; p.dive = 0; p.press = false; }
   const b = G.ball; Object.assign(b, { x: GX, y: 52.5, z: 0, vx: 0, vy: 0, vz: 0, shot: null, noPick: null, rolls: null });
   const taker = team === 0 ? G.hero : G.P.find(p => p.team === 1 && p.slot === 'FW2');
-  taker.x = GX; taker.y = team === 0 ? 53.6 : 51.4; own(taker);
+  taker.x = GX; taker.y = team === 0 ? 53.6 : 51.4; G.fairSteal = true; own(taker); G.fairSteal = false;   // kickoff (half-time may start with our ball)
   G.oneTwo = null; G.since = Math.min(G.since, 4); b.net = null;
 }
 function own(p) { const b = G.ball;
-  if (AUD && b.owner && b.owner.team === 0 && p.team === 1 && !G.paused && !G.fairSteal) audBad('steal_no_warning', { from: b.owner.name, by: p.name });
+  if (AUD && b.owner && b.owner.team === 0 && p.team === 1 && !G.fairSteal) audBad('steal_no_warning', { from: b.owner.name, by: p.name, paused: !!G.paused });   // also during fades: no magic possession
   b.owner = p; b.last = p; b.shot = null; b.air = false; b.net = null; b.x = p.x; b.y = p.y + (p.team === 0 ? -.8 : .8); G.ownT = G.t; p.plan = null; b.vx = b.vy = b.vz = 0; b.z = 0; b.rolls = null; for (const q of G.P) { q.press = false; q.wind = null; } }
 const mates = p => G.P.filter(q => q.team === p.team && q !== p);
 const foes = p => G.P.filter(q => q.team !== p.team);
@@ -188,6 +188,7 @@ function shiftHome(p) {
   if (att) u = L === 'FW' ? clamp(Math.max(ub + 13, uh + 4), 0, H - 13) : L === 'MF' ? clamp(Math.max(ub + 2, uh + (ub - 52.5) * .3), 0, H - 22) : clamp(ub - 22, uh, 58);
   else u = L === 'DF' ? clamp(ub - 13, 7, uh + 20) : L === 'MF' ? clamp(ub - 6, 13, uh + 26) : clamp(ub + 1, 28, uh + 14);
   if (p.team === 0) u += { att: 6, def: -6, bal: 0 }[PLAN.tactic] || 0;
+  if (G.push === p.team && L !== 'GK') u += L === 'DF' ? 8 : 6;   // last-minute push (finalScene)
   const x = GX + (p.hx - GX) * (att && L !== 'DF' ? 1.15 : 1) + (b.x - GX) * .35;
   return [clamp(x, 3, W - 3), clamp(U(u), 2, H - 2)];
 }
@@ -341,7 +342,7 @@ function restart() {
   }
   b.x = clamp(b.x, 1, W - 1); b.y = clamp(b.y, 1, H - 1);       // throw-in to the other team
   const p = G.P.filter(q => q.team === team && q.role !== 'GK').sort((a, c) => dist(a, b) - dist(c, b))[0];
-  p.x = b.x; p.y = b.y; p.vx = p.vy = 0; own(p);
+  p.x = b.x; p.y = b.y; p.vx = p.vy = 0; own(p); pop(p.x, p.y + (team ? 2 : -2), team ? 'THROW-IN (THEM)' : 'THROW-IN', '#ddd');
 }
 function pop(x, y, text, col) { G.pops.push({ x, y, text, col: col || '#fff', t: 0 }); }
 function burst(x, y, n, col, sp = 6, life = .6, size = .35) {
@@ -402,7 +403,8 @@ function passLongTo(p, tx0, ty0, runner) {                   // lofted ball over
   pop(p.x, p.y - 2, ok ? 'LONG BALL!' : 'OVERHIT...', ok ? '#8fd8ff' : '#ddd');
 }
 function passCut(p, mate) {                                   // a lost pass in a scene: played, and read by the defender nearest the lane
-  const f = foes(p).filter(q => q.stun <= 0).sort((a, c) => laneD(a, p, mate) - laneD(c, p, mate))[0];
+  const f = foes(p).filter(q => q.stun <= 0 && q.role !== 'GK').sort((a, c) => laneD(a, p, mate) - laneD(c, p, mate))[0];
+  if (!f) return pass(p, mate, true);
   passPoint(p, f.x, f.y); G.ball.rolls = new Map(); pop(f.x, f.y - 2, 'READ IT!', '#ff6b6b');
 }
 function laneD(q, a, b) { const vx = b.x - a.x, vy = b.y - a.y, L = vx * vx + vy * vy || 1, t = clamp(((q.x - a.x) * vx + (q.y - a.y) * vy) / L, 0, 1); return Math.hypot(q.x - a.x - t * vx, q.y - a.y - t * vy); }
@@ -495,18 +497,15 @@ function freeKick(fouler) {                                   // a foul on Kai n
   }, 700, true);
   setTimeout(() => { if (G && !G.over) { G.paused = false; openScene('freekick', { me: c, them: keeperOf(1), fouler }); } }, 900 / FAST);
 }
-function finalScene() {
-  G.finalDone = true;
+function finalScene() {                                     // the last minute: no fade, no teleport, nobody is handed the ball (owner, 25 Nov)
+  G.finalDone = true; audN('final_push');
   const diff = G.score[0] - G.score[1];
-  if (diff <= 0) {                                            // LAST CHANCE: the hero at the edge of the box, Spirit topped up for a special
-    cut(() => { for (const q of foes(G.hero)) if (q.role !== 'GK') { q.y = Math.min(q.y, 30) + 6; q.stun = .5; }
-      G.hero.x = GX + rnd(-6, 6); G.hero.y = 19; own(G.hero); G.ctrl = G.hero; G.sp = Math.max(G.sp, specCost()); banner('LAST CHANCE!', 'small'); }, 700, true);
-    setTimeout(() => { if (G && !G.over) { G.paused = false; openScene('shot', { me: G.hero, them: keeperOf(1), final: true }); } }, 1300 / FAST);
-  } else {                                                    // HOLD THE LEAD: their striker breaks through
-    const fw = G.star && G.star.role === 'FW' ? G.star : G.P.find(p => p.team === 1 && p.role === 'FW');   // their star gets the breakaway
-    cut(() => { fw.x = GX + rnd(-6, 6); fw.y = H - 21; own(fw);
-      for (const q of G.P) if (q.team === 0 && q.role !== 'GK') q.y = Math.min(H - 12, Math.max(q.y, H - 34)); banner('HOLD THE LEAD!', 'small'); }, 700, true);
-    setTimeout(() => { if (G && !G.over) { G.paused = false; rivalShot(fw, true); } }, 1300 / FAST);
+  if (diff <= 0) {                                            // level or behind: our team pushes up, and Spirit is topped up for a special
+    G.push = 0; G.sp = Math.max(G.sp, specCost()); banner('LAST CHANCE!', 'small');
+    setHint('Everyone forward! Your Spirit is full enough for a special.', 3500);
+  } else {                                                    // ahead: they throw everyone forward, and you have to defend it for real
+    G.push = 1; banner('HOLD THE LEAD!', 'small');
+    setHint('They are pushing everyone forward. Win the ball back!', 3500);
   }
 }
 

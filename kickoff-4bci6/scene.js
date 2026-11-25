@@ -159,18 +159,18 @@ async function consequence(kind, cx, o, win) {
       } else {
         const rs = RIVAL_SP[them.name], used = (G.rivalUsed = G.rivalUsed || {});
         if (rs && !rs.pen && (used[them.name] || 0) < 2) { used[them.name] = (used[them.name] || 0) + 1; await techFX(rs.name, rs.face, rs.cols, 1.2, false); if (!G) return; }
-        own(them); me.stun = 1.1; burst(me.x, me.y, 14, '#c9b58a', 4); pop(them.x, them.y - 2, them.name === 'Bruno' ? 'THE WALL!' : 'STOLEN!', '#ff6b6b');
+        G.fairSteal = true; own(them); G.fairSteal = false; me.stun = 1.1;   // a lost duel: the odds were shown burst(me.x, me.y, 14, '#c9b58a', 4); pop(them.x, them.y - 2, them.name === 'Bruno' ? 'THE WALL!' : 'STOLEN!', '#ff6b6b');
       }
       break;
     }
     case 'onetwo': {
       if (win) { them.stun = 1.4; G.oneTwo = { tx: clamp(me.x + rnd(-4, 4), 8, W - 8), ty: Math.max(14, me.y - 13) }; pass(me, G.mo, true); pop(me.x, me.y - 2, 'ONE-TWO!', '#ffd23f');
         if (Math.random() < .35) toast('mo', 'MO', pick(['Go, Kai!', 'Here it comes!', 'Nice one!'])); }
-      else { own(them); pop(them.x, them.y - 2, 'INTERCEPTED', '#ff6b6b'); me.stun = .6; }
+      else { passCut(me, G.mo); me.stun = .6; }   // the ball really travels to the man who read it
       break;
     }
     case 'tokai': {
-      if (win) { them.stun = 1.2; pass(me, G.hero, true); } else { own(them); pop(them.x, them.y - 2, 'INTERCEPTED', '#ff6b6b'); }
+      if (win) { them.stun = 1.2; pass(me, G.hero, true); } else passCut(me, G.hero);
       break;
     }
     case 'back': { const t = G.P.filter(q => q.team === 0 && q.role === 'DF').sort((a, c) => dist(a, me) - dist(c, me))[0]; pass(me, t, true); break; }
@@ -197,7 +197,7 @@ async function consequence(kind, cx, o, win) {
       if (win) { const mo = G.mo, tx = clamp(lerp(mo.x, GX, .5), 10, W - 10), ty = clamp(Math.min(mo.y - 8, 18), 16, 40);
         for (const f of foes(mo)) if (f.role !== 'GK') f.stun = 2.4;
         passPoint(me, tx, ty); G.ball.rolls = new Map(); mo.runTo = { x: tx, y: ty, until: G.t + 4 }; G.chain = true; pop(me.x, me.y - 2, 'NEEDLE PASS!', '#9dff7a'); }
-      else { own(them); pop(them.x, them.y - 2, 'READ IT!', '#ff6b6b'); }
+      else passCut(me, G.mo);
       break;
     }
     case 'tackle': case 'clamp': case 'slide': {
