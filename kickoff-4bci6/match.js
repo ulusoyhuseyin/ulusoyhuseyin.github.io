@@ -257,7 +257,8 @@ function ballStep(dt) {
   if (b.owner) {
     const p = b.owner, sp = Math.hypot(p.vx, p.vy) || 1, f = .75 + .25 * Math.sin(G.t * 14);
     b.x = p.x + p.vx / sp * f; b.y = p.y + p.vy / sp * f; b.z = 0; b.trail.length = 0;
-    if (p.x < 0 || p.x > W || p.y < 0 || p.y > H) outOfPlay();   // dribbled over a line: out of play, like real football
+    if (p.x < 0 || p.x > W || p.y < 0 || p.y > H) {             // dribbled over a line: out of play, like real football; the ball is nobody's now
+      if (!G.cutting) pop(clamp(p.x, 2, W - 2), clamp(p.y, 2, H - 2) - 2, 'OUT!', '#ddd'); b.last = p; b.owner = null; outOfPlay(); }
     return;
   }
   if (b.net) {                                                // in the net: roll to the back of it and stay between the posts
@@ -618,7 +619,7 @@ function hud() {
     if (p === G.hero && e < 35 && !G.tiredSeen && free) { G.tiredSeen = true; setHint(`${p.name} is tired: slower and weaker. Let go of the stick to walk and rest, or pass.`, 4500); }
     const pb = $('bPlan'); pb.classList.toggle('on', (free || G.plan) && !G.over); pb.firstChild.textContent = G.plan ? '▶ PLAY' : '⏸ PLAN';
     const ours = free && b.owner === p && p.team === 0;
-    G.tg = ours ? { s: stickyTarget('s', fwdFirst(p, AI.rankPass(p, 'pass')), now), l: stickyTarget('l', AI.rankPass(p, 'long'), now) } : null;
+    G.tg = ours ? { s: stickyTarget('s', fwdFirst(p, AI.rankPass(p, 'pass')), now), l: stickyTarget('l', fwdLong(p, AI.rankPass(p, 'long')), now) } : null;
     const sp = G.tg && G.tg.s && (G.tgSel.sObj || {}).p;
     setBtn('bShoot', ours && distToGoal(p) < 34 && angleOk(p), `${Math.round(clamp(shotChance(p, keeperOf(1), false) - tiredPen(p), .03, .8) * 100)}%`);
     setBtn('bPass', ours && !!G.tg.s, G.tg && G.tg.s ? `→ ${G.tg.s.name}${sp ? ` ${Math.round(sp * 100)}%` : ''}` : '');
@@ -645,6 +646,7 @@ function fwdFirst(p, list) {
   const gain = o => p.y - o.q.y, f = list.filter(o => gain(o) > 2 && o.p >= .55);
   return f.length ? [...f, ...list.filter(o => !f.includes(o))].map((o, i) => i ? o : { ...o, v: Math.max(o.v, list[0].v) }) : list;
 }
+const fwdLong = (p, list) => list.filter(o => p.y - o.q.y > 6);   // a LONG PASS goes forward, never 25 m back to a defender (owner, 26 Nov)
 const spGain = () => 9 * (1 + (save.stats.spirit - 10) * .04);
 
 const armed = id => G && !G.paused && performance.now() - ($(id).onAt || 0) > 350 && G.t - (G.ownT || 0) > .3 * FAST;

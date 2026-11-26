@@ -2,7 +2,8 @@
 // The camera pulls back; with the ball every teammate shows a pass line with its real success chance (the same AI evaluation
 // the opponents use) and the AI's best idea gets a star. Tap a teammate to pass, tap the goal to shoot, or pick a move.
 // Without the ball: tap a teammate to control him, STOP HIM (tackle decision) or PRESS. Team tactics: DEFEND / BALANCED / ATTACK.
-// Keyboard (desktop): Space = PLAN, WASD/arrows = run, J = pass, L = long ball, K = shoot, H = tackle, 1-4 = pick an option.
+// With the ball PLAN always lists PASS / LONG PASS / SHOOT / SPECIAL SHOT (greyed out with the reason when not possible).
+// Keyboard (desktop): Space = PLAN, WASD/arrows = run, J = pass, L = long ball, K = shoot, H = tackle, 1-5 = pick an option.
 'use strict';
 
 const PLAN = { on: false, tactic: 'bal', info: null };
@@ -10,6 +11,7 @@ function planOpen() {
   if (!G || G.paused || G.cutting || G.goalKick || G.over || G.goalAnim || CINE.on || G.ball.shot || G.tut) return;
   audN('plan'); PLAN.on = true; G.paused = true; G.plan = true; steer = null; touch = null; snd('tick');
   G.stat.plans = (G.stat.plans || 0) + 1;
+  $('hint').style.opacity = 0; $('toast').classList.remove('on');   // tips and speech bubbles would cover the pass chances
   planBar();
 }
 function planClose() { PLAN.on = false; PLAN.spot = null; if (G) { G.plan = false; G.paused = false; } $('planbar').classList.remove('on'); }
@@ -19,9 +21,22 @@ function planInfo() {
     const opts = AI.options(car); let best = null;
     for (const o of opts) if (!best || o.v > best.v) best = o;
     const passes = opts.filter(o => o.kind === 'pass' || o.kind === 'long').sort((a, b) => b.v - a.v).slice(0, 5);
-    for (const o of passes) info.marks.push({ q: o.q, p: o.p, kind: o.kind, best: o === best });
+    info.pass = fwdFirst(car, opts.filter(o => o.kind === 'pass').sort((a, b) => b.v - a.v))[0] || null;   // same picks as the PASS / LONG buttons
+    info.long = fwdLong(car, opts.filter(o => o.kind === 'long').sort((a, b) => b.v - a.v))[0] || null;
+    if (info.long && !passes.some(o => o.q === info.long.q)) passes.push(info.long);
+    if (!info.long) {                                         // nobody 24 m+ ahead: offer a lofted ball into the space in front of the furthest teammate
+      const up = G.P.filter(q => q.team === 0 && q.role !== 'GK' && q !== car && q.stun <= 0 && car.y - q.y > 6).sort((a, b) => a.y - b.y)[0];
+      const sc = up && spaceChance(car, clamp(up.x, 4, W - 4), clamp(up.y - 7, 4, H - 4));
+      if (sc && sc.lofted && sc.who && sc.who.team === 0) info.longSpace = sc;
+    }   // the LONG PASS button's target always has its line
+    for (const o of passes) info.marks.push({ q: o.q, p: o.p, kind: o.kind, best: o === best || (best.kind === o.kind && best.q === o.q) });
     info.best = best; info.car = car;
     info.shot = angleOk(car) && distToGoal(car) < 34 ? clamp(shotChance(car, keeperOf(1), false) - tiredPen(car), .03, .8) : null;
+    // the special shot: always listed, with the honest reason when it can't be used yet (owner, 26 Nov: shoot, special shoot and long pass in PLAN)
+    const cost = specCost(), d = Math.round(distToGoal(car));
+    info.spec = car !== G.hero ? { why: `only ${G.hero.name} has one` } : G.sp < cost ? { why: `need ${cost} spirit · have ${Math.floor(G.sp)}` }
+      : car.en < EN.comet ? { why: `too tired · need ⚡${EN.comet}` } : d >= 30 ? { why: `${d} m · get within 30 m` } : !angleOk(car) ? { why: 'no angle · move inside' }
+      : { ch: bonuses({ ch: shotChance(car, keeperOf(1), true), special: true }, car).ch };
     info.foe = foes(car).filter(f => f.role !== 'GK' && f.stun <= 0).sort((a, d) => dist(a, car) - dist(d, car))[0];
   } else if (info.mode === 'defend') {
     info.car = car;
@@ -31,15 +46,22 @@ function planInfo() {
 }
 function planBar() {
   const info = PLAN.info = planInfo(), bar = $('planbar'), acts = $('planacts'), c = G.ctrl;
-  const btn = (label, sub, fn, cls) => { const b = document.createElement('button'); b.innerHTML = `${label}<small>${sub}</small>`; if (cls) b.className = cls; b.onclick = fn; acts.appendChild(b); };
+  const btn = (label, sub, fn, cls, off) => { const b = document.createElement('button'), n = acts.children.length + 1;
+    b.innerHTML = `${label}<small>${sub}</small>`; if (cls) b.className = cls; b.disabled = !!off; b.dataset.n = n; b.onclick = fn; acts.appendChild(b); };
   acts.innerHTML = '';
   if (info.mode === 'attack') {
     const car = info.car, bestTxt = info.best.kind === 'pass' || info.best.kind === 'long' ? `pass to ${info.best.q.name}` : info.best.kind === 'shoot' ? 'shoot' : info.best.kind === 'dribble' ? 'keep running' : 'hold it';
     $('planhint').innerHTML = PLAN.spot ? `Pass into space: <b>${Math.round(PLAN.spot.p * 100)}%</b> · ${PLAN.spot.who ? PLAN.spot.who.name + ' runs for it' : ''}. Tap the spot again to play it.`
       : `Tap a teammate to pass, an empty spot to pass into space, or the goal to shoot. <b>★ Best: ${bestTxt}</b>`;
-    if (info.shot !== null) btn('SHOOT', `${Math.round(info.shot * 100)}%`, () => { planClose(); shootNow(car); G.stat.free++; });
+    const pct = p => `${Math.round(p * 100)}%`, d = Math.round(distToGoal(car));
+    btn('PASS', info.pass ? `→ ${info.pass.q.name} ${pct(info.pass.p)}` : 'nobody open', () => { planClose(); pass(car, info.pass.q); car.en = Math.max(0, car.en - 2); }, '', !info.pass);
+    const ls = info.longSpace;
+    if (info.long || !ls) btn('LONG PASS', info.long ? `→ ${info.long.q.name} ${pct(info.long.p)}` : 'nobody far ahead · use PASS', () => { planClose(); passLong(car, info.long.q); G.stat.free++; }, 'lg', !info.long);
+    else btn('LONG PASS', `into space · ${ls.who.name} ${pct(ls.p)}`, () => { PLAN.spot = null; planClose(); passSpace(car, ls.x, ls.y); G.stat.free++; }, 'lg');
+    btn('SHOOT', info.shot !== null ? `${pct(info.shot)} · ${d} m` : d >= 34 ? `${d} m · get closer` : 'no angle · move inside', () => { planClose(); shootNow(car); G.stat.free++; }, '', info.shot === null);
+    btn('SPECIAL SHOT', info.spec.ch ? `COMET DRIVE ${pct(info.spec.ch)} · ${specCost()} spirit` : info.spec.why,
+      () => { planClose(); openScene('shot', { me: car, them: keeperOf(1), auto: 'comet' }); }, 'sp', !info.spec.ch);
     if (info.foe && dist(info.foe, car) < 8 && G.since > 1) btn('TAKE HIM ON', `run at ${info.foe.name}`, () => { planClose(); G.want = { kind: 'attack', me: car, them: info.foe, until: G.t + 4 }; });
-    if (car === G.hero && G.sp >= specCost() && angleOk(car) && distToGoal(car) < 30) btn('COMET DRIVE!', `${specCost()} spirit`, () => { planClose(); openScene('shot', { me: car, them: keeperOf(1) }); }, 'sp');
   } else if (info.mode === 'defend') {
     $('planhint').innerHTML = `Tap a teammate to control him. ${info.car.name} has the ball.`;
     if (info.tackle !== null) btn('STOP HIM', `${c.name} · ${Math.round(info.tackle * 100)}%`, () => { planClose(); G.want = { kind: 'defend', me: c, them: info.car, until: G.t + 4 }; G.ctrlLock = G.t + 4; });
@@ -69,7 +91,8 @@ $('bPlan').onclick = () => (PLAN.on ? planClose() : planOpen());
 function W2S(x, y) { const [u, v] = w2s(x - G.cam.x, y - G.cam.y); return [CW / 2 + u * S * G.cam.z, CH / 2 + v * S * G.cam.z]; }
 function pill(c, x, y, text, col, big) {
   c.font = `${big ? 17 : 14}px Bangers, sans-serif`; const w = c.measureText(text).width + 12, h = big ? 22 : 19;
-  x = clamp(x, w / 2 + 4, CW - w / 2 - 4); y = clamp(y, 70, CH - 20);
+  const pb = $('planbar'), bot = pb.classList.contains('on') ? pb.offsetTop - h / 2 - 4 : CH - 20;   // never hidden under the PLAN panel
+  x = clamp(x, w / 2 + 4, CW - w / 2 - 4); y = clamp(y, 70, Math.max(80, bot));
   c.fillStyle = 'rgba(0,0,0,.78)'; c.beginPath(); c.roundRect(x - w / 2, y - h / 2, w, h, 8); c.fill();
   c.strokeStyle = col; c.lineWidth = 2; c.stroke(); c.fillStyle = col; c.textAlign = 'center'; c.textBaseline = 'middle'; c.fillText(text, x, y + 1); c.textBaseline = 'alphabetic';
 }
@@ -88,6 +111,11 @@ function drawPlan(c) {
     }
     if (info.shot !== null) { const [gx, gy] = W2S(GX, 0); pill(c, gx, gy + 18, `${info.best.kind === 'shoot' ? '★ ' : ''}SHOOT ${Math.round(info.shot * 100)}%`, info.best.kind === 'shoot' ? '#ffd23f' : '#fff', true); }
     c.strokeStyle = `rgba(255,210,63,${pulse})`; c.lineWidth = 3; c.beginPath(); c.arc(cx, cy, 26, 0, 7); c.stroke();
+    const ls = info.longSpace;
+    if (ls && !PLAN.spot) { const [x, y] = W2S(ls.x, ls.y), [rx, ry] = W2S(ls.who.x, ls.who.y), col = ls.p >= .65 ? '#7dff9a' : ls.p >= .45 ? '#ffe27a' : '#ff8a7a';
+      c.strokeStyle = col; c.globalAlpha = .8; c.lineWidth = 2; c.setLineDash([8, 6]); c.beginPath(); c.moveTo(cx, cy); c.lineTo(x, y); c.stroke();
+      c.strokeStyle = 'rgba(143,216,255,.8)'; c.setLineDash([3, 4]); c.beginPath(); c.moveTo(rx, ry); c.lineTo(x, y); c.stroke(); c.setLineDash([]); c.globalAlpha = 1;
+      c.strokeStyle = col; c.beginPath(); c.arc(x, y, 12, 0, 7); c.stroke(); pill(c, x, y - 24, `LONG ${Math.round(ls.p * 100)}%`, col); }
     const sp = PLAN.spot;
     if (sp) { const [x, y] = W2S(sp.x, sp.y), col = sp.p >= .65 ? '#7dff9a' : sp.p >= .45 ? '#ffe27a' : '#ff8a7a';
       c.strokeStyle = col; c.lineWidth = 3; c.setLineDash([6, 5]); c.beginPath(); c.moveTo(cx, cy); c.lineTo(x, y); c.stroke(); c.setLineDash([]);
@@ -121,6 +149,10 @@ addEventListener('keydown', e => {
   const scene = document.querySelector('#scene.on');
   if (scene && /^Digit[1-9]$/.test(e.code)) { const b = scene.querySelectorAll('#opts button')[+e.code.slice(5) - 1]; if (b && !b.disabled) b.click(); return; }
   if (e.code === 'Space' && !e.repeat) { e.preventDefault(); if (PLAN.on) planClose(); else planOpen(); return; }
+  if (PLAN.on) {                                              // in PLAN: 1-5 pick a button; J/L/K = pass / long / shoot
+    const n = /^Digit[1-9]$/.test(e.code) ? +e.code.slice(5) : { KeyJ: 1, KeyL: 2, KeyK: 3 }[e.code];
+    const b = n && $('planacts').querySelector(`button[data-n="${n}"]`); if (b && !b.disabled) b.click(); return;
+  }
   const click = id => { const b = $(id); if (b && b.classList.contains('on')) b.click(); };
   if (e.code === 'KeyK') click('bShoot'); else if (e.code === 'KeyJ') click('bPass'); else if (e.code === 'KeyL') click('bLong'); else if (e.code === 'KeyH') click('bTackle');
 });
@@ -135,7 +167,7 @@ function botFree(dt) {
   const p = G.ctrl, b = G.ball, r = Math.random(), on = id => $(id).classList.contains('on');
   if (b.owner === p && p.team === 0) {
     if (r < .1) { planOpen(); setTimeout(() => { if (!PLAN.on) return; const bs = [...$('planacts').querySelectorAll('button')];
-      if (bs.length && Math.random() < .5) return pick(bs).click();
+      const ok = bs.filter(b => !b.disabled); if (ok.length && Math.random() < .5) { pick(ok).click(); if (PLAN.on) planClose(); return; }
       const q = pick(G.P.filter(x => x.team === 0 && x.role !== 'GK' && x !== p)), [sx, sy] = W2S(q.x, q.y); planTap(sx, sy); if (PLAN.on) planClose(); }, 300); }
     else if (r < .4 && on('bPass')) $('bPass').click();
     else if (r < .5 && on('bShoot')) $('bShoot').click();

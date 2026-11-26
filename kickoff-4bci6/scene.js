@@ -108,6 +108,7 @@ function showScene(kind, cx, title, sub, hint, opts) {
   delete box.dataset.busy; box.classList.add('on');
   $('pl').style.display = 'none'; document.querySelectorAll('#acts button, #bPlan').forEach(b => b.classList.remove('on'));
   G.sceneOpen = performance.now();
+  if (cx.auto) { const o = opts.find(x => x.key === cx.auto && !x.disabled); if (o) { box.dataset.busy = '1'; return choose(kind, cx, o); } }   // PLAN's SPECIAL SHOT: no second pick
   if (BOT) setTimeout(() => { const ok = opts.filter(o => !o.disabled); const o = ok.find(x => x.special && Math.random() < .7) || pick(ok); if (G && G.paused && !box.dataset.busy) { box.dataset.busy = '1'; choose(kind, cx, o); } }, 300 / FAST);
 }
 
