@@ -4,19 +4,28 @@
 
 // 11 a side, 4-3-3 for both teams. Our team attacks up; the other team's spots are mirrored.
 const FORM = { GK: [34, 101], DF1: [12, 84], DF2: [26, 87], DF3: [42, 87], DF4: [56, 84], MF1: [18, 70], MF2: [34, 72], MF3: [50, 70], FW1: [14, 57], FW2: [34, 54], FW3: [54, 57] };
+// Growth (owner, 26 Nov): every ordinary player, on both teams, sits at the LEAGUE level of the match, and that level rises match by
+// match (6 → 7.5 → 9 …), so the numbers visibly grow. Kai, Mo and the rivals sit above it. Personal numbers below are offsets from it.
+// Running speed, stamina and pass accuracy use the stat relative to the league level (rv), so the pace stays right for children.
+const LEAGUE = [6, 7.5, 9, 10.5, 12];
+const leagueOf = m => LEAGUE[clamp(m, 1, LEAGUE.length) - 1];
+const GEN = { shoot: -1, dribble: 0, pass: .5, tackle: .5, speed: 0, stamina: 0 };   // an ordinary outfield player, relative to the league level
+const rv = (p, k) => (p.st[k] ?? G.L) - G.L + 10;       // the stat on the old 10-centred scale: 10 = an ordinary player this match
+const KAI_EDGE = 2;                                         // Kai starts 2 above an ordinary player; training adds on top
+const kaiStats = m => Object.fromEntries(Object.keys(BASE).map(k => [k, leagueOf(m) + KAI_EDGE + (save.stats[k] - 10)]));
 const OPPS = [
-  { name: 'Harbor Gulls', short: 'GUL', col: '#2f9e5b', gk: '#1b1b1b', bg: 'stadium', len: 120, iq: .55, base: { shoot: 6, dribble: 6.5, pass: 7, tackle: 6.5, speed: 8.5, catch: 8, stamina: 9 },
-    P: [['GK', 'Pike', 1, { catch: 9 }], ['DF1', 'Ivo', 2, { tackle: 7 }], ['DF2', 'Bram', 3, { tackle: 7 }], ['DF3', 'Oren', 4, { tackle: 7.5 }], ['DF4', 'Finn', 5, { tackle: 6.5, speed: 9.5 }],
-      ['MF1', 'Cal', 6, { pass: 8, dribble: 8 }], ['MF2', 'Vik', 10, { pass: 8.5, dribble: 8, tackle: 7 }], ['MF3', 'Noah', 8, { tackle: 7.5 }],
-      ['FW1', 'Rhys', 11, { shoot: 8, dribble: 8, speed: 10 }], ['FW2', 'Zane', 7, { shoot: 9, dribble: 8, speed: 10 }], ['FW3', 'Kit', 9, { shoot: 8, dribble: 8.5, speed: 10 }]] },
-  { name: 'Iron Valley', short: 'IRV', col: '#5d6773', gk: '#e9e9e9', bg: 'rain', len: 120, iq: .85, boss: 'Bruno', base: { shoot: 8, dribble: 8, pass: 8.5, tackle: 9, speed: 9.5, catch: 9, stamina: 10 },
-    P: [['GK', 'Holt', 1, { catch: 10 }], ['DF1', 'Flint', 2, { tackle: 10 }], ['DF2', 'Bruno', 5, { tackle: 18, dribble: 7, speed: 8, stamina: 14 }, 'bruno'], ['DF3', 'Gage', 4, { tackle: 10.5 }], ['DF4', 'Stone', 3, { tackle: 10, speed: 10 }],
-      ['MF1', 'Mace', 6, { tackle: 10 }], ['MF2', 'Rook', 8, { pass: 10, dribble: 10, tackle: 10 }], ['MF3', 'Pierce', 7, { pass: 9.5, dribble: 9 }],
-      ['FW1', 'Cole', 11, { shoot: 10, dribble: 9.5, speed: 10.5 }], ['FW2', 'Dax', 9, { shoot: 11.5, dribble: 10.5, speed: 11 }], ['FW3', 'Vance', 10, { shoot: 10, dribble: 9.5 }]] },
-  { name: 'Storm Academy', short: 'STA', col: '#5fb4e6', gk: '#1b1b1b', bg: 'school', len: 120, iq: .9, boss: 'Ren', tag: 'the prodigy', base: { shoot: 9, dribble: 9.5, pass: 10, tackle: 10, speed: 10.5, catch: 10, stamina: 11 },
-    P: [['GK', 'Ise', 1, { catch: 11 }], ['DF1', 'Yuri', 2, { tackle: 11 }], ['DF2', 'Kenji', 5, { tackle: 11.5 }], ['DF3', 'Noel', 4, { tackle: 11 }], ['DF4', 'Ash', 3, { tackle: 10.5, speed: 11 }],
-      ['MF1', 'Taro', 6, { pass: 11, tackle: 10.5 }], ['MF2', 'Lio', 8, { pass: 11.5, dribble: 10.5 }], ['MF3', 'Remy', 7, { pass: 10.5, tackle: 11 }],
-      ['FW1', 'Haru', 11, { shoot: 11, dribble: 10.5, speed: 11 }], ['FW2', 'Ren', 10, { shoot: 14, dribble: 14, pass: 11, speed: 12, stamina: 13 }, 'ren'], ['FW3', 'Max', 9, { shoot: 10.5, dribble: 10 }]] },
+  { name: 'Harbor Gulls', short: 'GUL', col: '#2f9e5b', gk: '#1b1b1b', bg: 'stadium', len: 120, iq: .55, adj: -1, flav: { speed: -.5 },
+    P: [['GK', 'Pike', 1, { catch: 1 }], ['DF1', 'Ivo', 2, { tackle: .5 }], ['DF2', 'Bram', 3, { tackle: .5 }], ['DF3', 'Oren', 4, { tackle: 1 }], ['DF4', 'Finn', 5, { speed: 1 }],
+      ['MF1', 'Cal', 6, { pass: 1, dribble: 1.5 }], ['MF2', 'Vik', 10, { pass: 1.5, dribble: 1.5, tackle: .5 }], ['MF3', 'Noah', 8, { tackle: 1 }],
+      ['FW1', 'Rhys', 11, { shoot: 2, dribble: 1.5, speed: 1.5 }], ['FW2', 'Zane', 7, { shoot: 3, dribble: 1.5, speed: 1.5 }], ['FW3', 'Kit', 9, { shoot: 2, dribble: 2, speed: 1.5 }]] },
+  { name: 'Iron Valley', short: 'IRV', col: '#5d6773', gk: '#e9e9e9', bg: 'rain', len: 120, iq: .85, adj: 0, flav: { tackle: 1 }, boss: 'Bruno',
+    P: [['GK', 'Holt', 1, { catch: 2.5 }], ['DF1', 'Flint', 2, { tackle: 1 }], ['DF2', 'Bruno', 5, { tackle: 9, dribble: -1, speed: -1.5, stamina: 4 }, 'bruno'], ['DF3', 'Gage', 4, { tackle: 1.5 }], ['DF4', 'Stone', 3, { tackle: 1, speed: 1 }],
+      ['MF1', 'Mace', 6, { tackle: 1 }], ['MF2', 'Rook', 8, { pass: 1.5, dribble: 2, tackle: 1 }], ['MF3', 'Pierce', 7, { pass: 1, dribble: 1 }],
+      ['FW1', 'Cole', 11, { shoot: 2, dribble: 1.5, speed: 1 }], ['FW2', 'Dax', 9, { shoot: 3.5, dribble: 2.5, speed: 1.5 }], ['FW3', 'Vance', 10, { shoot: 2, dribble: 1.5 }]] },
+  { name: 'Storm Academy', short: 'STA', col: '#5fb4e6', gk: '#1b1b1b', bg: 'school', len: 120, iq: .9, adj: .5, flav: { pass: .5, speed: .5 }, boss: 'Ren', tag: 'the prodigy',
+    P: [['GK', 'Ise', 1, { catch: 3.5 }], ['DF1', 'Yuri', 2, { tackle: 1 }], ['DF2', 'Kenji', 5, { tackle: 1.5 }], ['DF3', 'Noel', 4, { tackle: 1 }], ['DF4', 'Ash', 3, { tackle: .5, speed: .5 }],
+      ['MF1', 'Taro', 6, { pass: 1, tackle: .5 }], ['MF2', 'Lio', 8, { pass: 1.5, dribble: 1 }], ['MF3', 'Remy', 7, { pass: .5, tackle: 1 }],
+      ['FW1', 'Haru', 11, { shoot: 2, dribble: 1, speed: .5 }], ['FW2', 'Ren', 10, { shoot: 5, dribble: 5, pass: 1, speed: 1.5, stamina: 2 }, 'ren'], ['FW3', 'Max', 9, { shoot: 1.5, dribble: .5 }]] },
 ];
 // rival specials used against the player (DESIGN §4): Ren's shot, Bruno's block, Dax's shot (owner, 24 Nov: match 2 needs a special shot too).
 // Twice a match each at most. Match 1 has none on purpose: it's the easy first match.
@@ -39,24 +48,28 @@ function player(team, role, name, num, st, face) {
   return { team, role: role.slice(0, 2), slot: role, hx: x, hy: y, x, y, vx: 0, vy: 0, st, name, num, face, stun: 0, dive: 0, diveX: 0, trail: [], ghost: 0, press: false, en: 100, rec: true };
 }
 // everyone is built differently (owner, 24 Nov): forwards are quick but tire sooner, midfielders run all day
-const ROLE_FIT = (b, r) => r.startsWith('FW') ? { speed: b.speed + .5, stamina: b.stamina - 1.5 } : r.startsWith('MF') ? { stamina: b.stamina + 2 } : r.startsWith('DF') ? { speed: b.speed - .5, stamina: b.stamina + .5 } : {};
+const ROLE_FIT = r => r.startsWith('FW') ? { speed: .5, stamina: -1.5 } : r.startsWith('MF') ? { stamina: 2 } : r.startsWith('DF') ? { speed: -.5, stamina: .5 } : {};
+function lift(base, ...offs) {                              // league level + offsets → a stat block
+  const o = {}; for (const k of Object.keys(GEN)) o[k] = base + GEN[k] + offs.reduce((s, f) => s + (f[k] || 0), 0); return o;
+}
 function newMatch() {
-  const m = Math.min(save.match, OPPS.length), opp = OPPS[m - 1];
-  const ours = (st) => ({ shoot: 7, dribble: 8, pass: 9, tackle: 9, speed: 9.5, stamina: 10, ...st });
+  const m = Math.min(save.match, OPPS.length), opp = OPPS[m - 1], L = leagueOf(save.match), oL = L + (opp.adj || 0);
+  const ours = off => lift(L, off), gk = (base, c) => ({ catch: base + c, pass: base + .5 });
   const P = [
-    player(0, 'GK', 'Doi', 1, { catch: 9.5 + m * .5, pass: 9 }),
-    player(0, 'DF1', 'Aki', 2, ours({ tackle: 10, speed: 10.5 })), player(0, 'DF2', 'Kemal', 4, ours({ tackle: 11, speed: 8.5, stamina: 12 })),
-    player(0, 'DF3', 'Renzo', 5, ours({ tackle: 11, pass: 9.5, stamina: 11 })), player(0, 'DF4', 'Tomas', 3, ours({ tackle: 9.5, speed: 11, stamina: 8.5 })),
-    player(0, 'MF1', 'Yuto', 7, ours({ pass: 11, dribble: 10, shoot: 8, stamina: 12 })), player(0, 'MF2', 'Mo', 8, ours({ shoot: 9, dribble: 10, pass: 12 + m, speed: 10, stamina: 11 }), 'mo'),
-    player(0, 'MF3', 'Elif', 6, ours({ tackle: 10.5, pass: 10, speed: 9, stamina: 14 })),
-    player(0, 'FW1', 'Sami', 11, ours({ shoot: 9, dribble: 10.5, speed: 12, stamina: 8 })), player(0, 'FW2', save.name, 9, save.stats, 'kai'),
-    player(0, 'FW3', 'Lukas', 10, ours({ shoot: 9.5, dribble: 9, speed: 10, stamina: 10.5 })),
-    ...opp.P.map(([r, n, num, st, face]) => player(1, r, n, num, { ...opp.base, ...ROLE_FIT(opp.base, r), ...st }, face)),
+    player(0, 'GK', 'Doi', 1, gk(L, 2)),
+    player(0, 'DF1', 'Aki', 2, ours({ tackle: 1, speed: 1 })), player(0, 'DF2', 'Kemal', 4, ours({ tackle: 2, speed: -1, stamina: 2 })),
+    player(0, 'DF3', 'Renzo', 5, ours({ tackle: 2, pass: .5, stamina: 1 })), player(0, 'DF4', 'Tomas', 3, ours({ tackle: .5, speed: 1.5, stamina: -1.5 })),
+    player(0, 'MF1', 'Yuto', 7, ours({ pass: 2, dribble: 2, shoot: 1, stamina: 2 })),
+    player(0, 'MF2', 'Mo', 8, ours({ shoot: 2, dribble: 2.5, pass: 3.5 + .5 * m, speed: .5, stamina: 1 }), 'mo'),   // Mo: a special player, grows a bit faster
+    player(0, 'MF3', 'Elif', 6, ours({ tackle: 1.5, pass: 1, speed: -.5, stamina: 4 })),
+    player(0, 'FW1', 'Sami', 11, ours({ shoot: 2, dribble: 2.5, speed: 2.5, stamina: -2 })), player(0, 'FW2', save.name, 9, kaiStats(save.match), 'kai'),
+    player(0, 'FW3', 'Lukas', 10, ours({ shoot: 2.5, dribble: 1, speed: .5, stamina: .5 })),
+    ...opp.P.map(([r, n, num, st, face]) => player(1, r, n, num, r === 'GK' ? gk(oL, st.catch) : lift(oL, opp.flav || {}, ROLE_FIT(r), st), face)),
   ];
   const hero = P.find(p => p.team === 0 && p.slot === 'FW2'), mo = P.find(p => p.name === 'Mo');
   const star = P.filter(p => p.team === 1 && p.role !== 'GK').sort((a, c) => (c.st.shoot || 0) - (a.st.shoot || 0))[0];   // their best shooter: fed more, marked ★
-  G = { P, hero, mo, star, opp, m, ball: { x: GX, y: 52.5, z: 0, vx: 0, vy: 0, vz: 0, owner: null, last: null, noPick: null, noPickT: 0, shot: null, trail: [] },
-    score: [0, 0], t: 0, len: opp.len, paused: false, over: false, ctrl: hero, sp: 25, spMax: 100, tkCd: 0,
+  G = { P, hero, mo, star, opp, m, L, ball: { x: GX, y: 52.5, z: 0, vx: 0, vy: 0, vz: 0, owner: null, last: null, noPick: null, noPickT: 0, shot: null, trail: [] },
+    score: [0, 0], t: 0, len: opp.len, paused: false, over: false, ctrl: hero, sp: spMaxOf(), spMax: spMaxOf(), tkCd: 0,
     cam: { x: GX, y: 48, z: 1 }, parts: [], pops: [], shake: 0, slow: 1, timers: [], bgImg: IMG[opp.bg],
     since: 0, nextForce: 9, chain: false, tut: save.match === 1 && !save.plays ? 1 : 0, fkDone: m < 2, finalDone: false,
     streak: 0, lossRun: 0, zone: 0, real0: performance.now(), goalAnim: false,
@@ -65,7 +78,7 @@ function newMatch() {
   if (G.tut) { const bram = P.find(p => p.name === 'Bram'); bram.x = GX + 1; bram.y = 30; G.since = 2; bram.press = true; G.nextForce = 99; }
 }
 function kickoff(team) {
-  for (const p of G.P) { p.x = p.hx; p.y = p.hy; p.vx = p.vy = 0; p.stun = 0; p.dive = 0; p.press = false; p.down = 0; }
+  for (const p of G.P) { p.x = p.hx; p.y = p.hy; p.vx = p.vy = 0; p.stun = 0; p.dive = 0; p.press = false; p.downT = 0; }
   const b = G.ball; Object.assign(b, { x: GX, y: 52.5, z: 0, vx: 0, vy: 0, vz: 0, shot: null, noPick: null, rolls: null });
   const taker = team === 0 ? G.hero : G.P.find(p => p.team === 1 && p.slot === 'FW2');
   taker.x = GX; taker.y = team === 0 ? 53.6 : 51.4; G.fairSteal = true; own(taker); G.fairSteal = false;   // kickoff (half-time may start with our ball)
@@ -74,13 +87,22 @@ function kickoff(team) {
 function own(p) { const b = G.ball;
   if (AUD && b.owner && b.owner.team === 0 && p.team === 1 && !G.fairSteal) audBad('steal_no_warning', { from: b.owner.name, by: p.name, paused: !!G.paused });   // also during fades: no magic possession
   const o2 = G.oneTwo; if (o2 && (p !== o2.b || o2.back)) { G.oneTwo = null; if (p === o2.a) { G.chain = true; G.since = Math.max(G.since, 2.7); } }   // the runner got it back, or someone else did
-  b.owner = p; b.last = p; b.shot = null; b.air = false; b.net = null; b.x = p.x; b.y = p.y + (p.team === 0 ? -.8 : .8); G.ownT = G.t; p.plan = null; b.vx = b.vy = b.vz = 0; b.z = 0; b.rolls = null; for (const q of G.P) { q.press = false; q.wind = null; } }
+  b.owner = p; b.last = p; b.shot = null; b.air = false; b.cross = null; b.net = null; b.x = p.x; b.y = p.y + (p.team === 0 ? -.8 : .8); G.ownT = G.t; p.plan = null; b.vx = b.vy = b.vz = 0; b.z = 0; b.rolls = null; for (const q of G.P) { q.press = false; q.wind = null; } }
 const mates = p => G.P.filter(q => q.team === p.team && q !== p);
 const foes = p => G.P.filter(q => q.team !== p.team);
 const keeperOf = team => G.P.find(q => q.team === team && q.role === 'GK');
 const goalY = team => team === 0 ? 0 : H;                 // the goal a team attacks
 const later = (sec, fn) => G.timers.push({ t: G.t + sec, fn });
-const specCost = () => save.style === 'striker' ? 50 : 60;
+// Special shots (owner, 26 Nov): Kai's SPIRIT pool pays for specials. It starts full every match: 3-4 Comet Drives in match 1.
+// The pool grows with level and SPIRIT training; stronger shots unlock later and cost more. A special keeps its power over distance:
+// early on a Comet Drive can score from the halfway line, against the better keepers later it needs to be closer (or the stronger shot).
+// A special's power is its own (Kai's SHOOT adds 30%), so as keepers get better match by match the same shot needs to be taken closer.
+const SPECIALS = { comet: { name: 'COMET DRIVE', cost: 32, pow: 14, fall: .007, lvl: 1 }, meteor: { name: 'METEOR DRIVE', cost: 46, pow: 19, fall: .005, lvl: 3 } };
+const SPEC_RANGE = 56;
+const spMaxOf = () => Math.round(60 + 4 * save.stats.spirit + 10 * (save.lvl - 1));
+const shotCost = k => k === 'comet' && save.style === 'striker' ? 28 : SPECIALS[k].cost;
+const specCost = () => shotCost('comet');                  // the cheapest special (also IRON CLAMP / NEEDLE PASS)
+const unlockedSpecials = () => Object.keys(SPECIALS).filter(k => save.lvl >= SPECIALS[k].lvl);
 function addSp(v) { G.sp = clamp(G.sp + v, 0, G.spMax); }
 
 // ---------------------------------------------------------------- input: drag = run, tap = pass, flick = shoot
@@ -121,7 +143,7 @@ function flick(vx, vy) {                                     // a quick free sho
 
 // ---------------------------------------------------------------- actions
 function passErr(p, d) {                                    // metres of random error for a pass of length d
-  return (.3 + d * .045) * clamp(1.25 - ((p.st.pass || 9) - 10) * .06, .5, 1.6) * (1 + tiredPen(p) * 3) * (1 + AI.pressure(p.team, p.x, p.y) * .25);
+  return (.3 + d * .045) * clamp(1.25 - (rv(p, 'pass') - 10) * .06, .5, 1.6) * (1 + tiredPen(p) * 3) * (1 + AI.pressure(p.team, p.x, p.y) * .25);
 }
 function jitter(p, tx, ty, d) { const e = passErr(p, d), a = rnd(Math.PI * 2), r = Math.abs(rnd(-1, 1) + rnd(-1, 1)) * e * .7; return [clamp(tx + Math.cos(a) * r, 1, W - 1), clamp(ty + Math.sin(a) * r, 1, H - 1)]; }
 const atFeet = (b, p, tx, ty) => { const d = Math.hypot(tx - p.x, ty - p.y) || 1; b.x = p.x + (tx - p.x) / d * .8; b.y = p.y + (ty - p.y) / d * .8; b.z = 0; };
@@ -129,7 +151,7 @@ function pass(p, t, safe) {
   const b = G.ball; atFeet(b, p, t.x, t.y); let tx = t.x + t.vx * .3, ty = t.y + t.vy * .3; if (!safe) [tx, ty] = jitter(p, tx, ty, Math.hypot(tx - p.x, ty - p.y));
   const d = Math.hypot(tx - p.x, ty - p.y) || 1, sp = clamp(10 + d * .55, 12, 24);
   b.owner = null; b.vx = (tx - p.x) / d * sp; b.vy = (ty - p.y) / d * sp; b.noPick = p; b.noPickT = .35; b.passTo = t; b.last = p;
-  b.rolls = new Map(foes(p).map(q => [q, safe ? false : Math.random() < clamp(.2 + ((q.st.tackle || 8) - (p.st.pass || 9)) * .04, .05, .6)]));
+  b.rolls = new Map(foes(p).map(q => [q, safe ? false : Math.random() < clamp(.2 + ((q.st.tackle ?? G.L) - (p.st.pass ?? G.L)) * .04, .05, .6)]));
   if (p.team === 0) G.lastPasser = p;
   audDir(p, ty); snd('kick');
 }
@@ -145,6 +167,7 @@ function mouthAngle(p) {                                     // how much of the 
 }
 const angleOk = p => mouthAngle(p) > .16 && Math.abs(goalY(p.team) - p.y) > 3;
 const anglePen = p => (1 - clamp(mouthAngle(p) / .45, 0, 1)) * .25;
+const specAngleOk = p => Math.abs(goalY(p.team) - p.y) > 3 && Math.abs(p.x - GX) < Math.abs(goalY(p.team) - p.y) * 1.1 + 4;   // a special only needs to face the goal
 function shoot(p, aimX, special, out) {                      // out is decided before the kick (by the clash); the flight reveals it
   const b = G.ball, gk = keeperOf(1 - p.team), gy = goalY(p.team);
   if (AUD && p.team === 0 && !G.paused && !G.userShot) audBad('shot_not_chosen', { by: p.name }); G.userShot = false;
@@ -152,7 +175,7 @@ function shoot(p, aimX, special, out) {                      // out is decided b
   atFeet(b, p, aimX, gy);
   const d = Math.hypot(aimX - b.x, gy - b.y) || 1, sp = special ? 36 : 26;
   b.owner = null; b.last = p; b.vx = (aimX - b.x) / d * sp; b.vy = (gy - b.y) / d * sp; b.vz = special ? 1.6 : 3; b.z = .2;
-  b.shot = { by: p, out, special, aimX, gk, gy, assist: p.team === 0 && p !== G.hero && G.assistFrom === G.hero }; b.noPick = p; b.noPickT = 99; b.rolls = null;
+  b.shot = { by: p, out, special, aimX, gk, gy, reb: keeperDown(gk) > 0, assist: p.team === 0 && p !== G.hero && G.assistFrom === G.hero }; b.noPick = p; b.noPickT = 99; b.rolls = null;
   if (AUD) b.shot.k = { aimX: +aimX.toFixed(1), bx: +b.x.toFixed(1), by: +b.y.toFixed(1), px: +p.x.toFixed(1), py: +p.y.toFixed(1), vx: +b.vx.toFixed(1), vy: +b.vy.toFixed(1), t: +G.t.toFixed(1) };
   if (gk.stun > 0) gk.stun = Math.min(gk.stun, .15);   // a keeper on the ground scrambles up for the next shot (he is still not set: see keeperDown)
   gk.diveX = out === 'goal' ? aimX + (aimX > GX ? -2.2 : 2.2) : aimX;   // a beaten keeper dives the wrong way or too late
@@ -164,14 +187,14 @@ function shoot(p, aimX, special, out) {                      // out is decided b
 // Stamina (owner, 24 Nov): everyone starts at 100. Sprinting drains fast, running drains slowly, walking or standing recovers.
 // The most you can get back (the cap) also shrinks as the match goes on, so it can't be refilled for free. Half-time gives +25.
 // Tired players (under 60) run slower and (under 45) lose points on every chance; specials need the energy they cost.
-const topSpeed = p => 5.2 + (p.st.speed || 8) * .17;
+const topSpeed = p => 5.2 + rv(p, 'speed') * .17;
 function speedOf(p) { return topSpeed(p) * (G.ball.owner === p ? .86 : 1) * (.62 + .38 * Math.min(1, p.en / 60)); }
 const tiredPen = p => p.role === 'GK' || p.en >= 45 ? 0 : (45 - p.en) / 45 * .25;
-const capOf = p => p.role === 'GK' ? 100 : 100 - 30 * clamp(G.t / G.len, 0, 1) * clamp(1 - ((p.st.stamina || 10) - 10) * .06, .5, 1.3);
+const capOf = p => p.role === 'GK' ? 100 : 100 - 30 * clamp(G.t / G.len, 0, 1) * clamp(1 - (rv(p, 'stamina') - 10) * .06, .5, 1.3);
 const effort = p => { const r = Math.hypot(p.vx, p.vy) / topSpeed(p); return r > .88 ? 'sprint' : r > .5 ? 'run' : 'rest'; };
-const sprintCost = p => clamp(1 + ((p.st.speed || 10) - 10) * .04, .8, 1.5);   // a faster sprint burns more: SPEED and STAMINA pull against each other
+const sprintCost = p => clamp(1 + (rv(p, 'speed') - 10) * .04, .8, 1.5);   // a faster sprint burns more: SPEED and STAMINA pull against each other
 function stamRate(p, mode) {                                  // energy per second of match time
-  const k = (p.st.stamina || 10) - 10, drain = clamp(1 - k * .04, .55, 1.3);
+  const k = rv(p, 'stamina') - 10, drain = clamp(1 - k * .04, .55, 1.3);
   return mode === 'sprint' ? -3.2 * drain * sprintCost(p) : mode === 'run' ? -.35 * drain : 2.6 * clamp(1 + k * .05, .6, 1.5);
 }
 function moveTo(p, tx, ty, k = 1) {
@@ -191,14 +214,16 @@ function shiftHome(p) {
   else u = L === 'DF' ? clamp(ub - 13, 7, uh + 20) : L === 'MF' ? clamp(ub - 6, 13, uh + 26) : clamp(ub + 1, 28, uh + 14);
   if (p.team === 0) u += { att: 6, def: -6, bal: 0 }[PLAN.tactic] || 0;
   if (G.push === p.team && L !== 'GK') u += L === 'DF' ? 8 : 6;   // last-minute push (finalScene)
-  const x = GX + (p.hx - GX) * (att && L !== 'DF' ? 1.15 : 1) + (b.x - GX) * .35;
+  let x = GX + (p.hx - GX) * (att && L !== 'DF' ? 1.15 : 1) + (b.x - GX) * .35;
+  if (att && L === 'FW' && holder !== p && Math.abs(holder.x - GX) > 13 && U(holder.y) > 62) {   // a teammate is out wide near their box: strikers attack the box for a cross
+    u = H - 11 - Math.abs(p.hx - GX) * .12; x = GX + (p.hx - GX) * .3 + (holder.x > GX ? -1.5 : 1.5); }
   return [clamp(x, 3, W - 3), clamp(U(u), 2, H - 2)];
 }
 function step(dt) {
   if (G.over) return;
   if (AUD) { for (const p of G.P) if (p.ax !== undefined && !G.afterCut && Math.hypot(p.x - p.ax, p.y - p.ay) > 2.5) audBad('teleport', { name: p.name, d: +Math.hypot(p.x - p.ax, p.y - p.ay).toFixed(1) }); G.afterCut = false; }
   const b = G.ball; dt *= G.slow;
-  G.t += dt; G.since += dt; addSp(dt * (G.zone > 0 ? .6 : .25));
+  G.t += dt; G.since += dt; if (G.zone > 0) addSp(dt * .4);   // Spirit comes back only from won duels and ZONE
   if (G.zone > 0 && (G.zone -= dt) <= 0) { G.zone = 0; $('zone').classList.remove('on'); }
   for (const tm of G.timers.filter(x => x.t <= G.t)) { G.timers.splice(G.timers.indexOf(tm), 1); tm.fn(); }
   if (G.t >= G.len && !b.shot && !G.goalAnim && !G.paused) return finish();
@@ -285,6 +310,11 @@ function ballStep(dt) {
   }
   const sp = Math.hypot(b.vx, b.vy); if (sp > 0 && b.z <= 0) { const f = Math.exp(-1.1 * dt); b.vx *= f; b.vy *= f; if (sp < .4) b.vx = b.vy = 0; }
   if (b.air && b.z <= 0) b.air = false;
+  if (b.cross) {                                              // a cross dropping onto the man it was meant for: the header / volley decision
+    const q = b.cross.to;
+    if (!b.air) b.cross = null;
+    else if (b.vz < 0 && b.z < 2.6 && q.stun <= 0 && dist(q, b) < 2.4 && !G.cutting && !G.paused && !G.goalAnim) { b.cross = null; return aerial(q); }
+  }
   if ((b.noPickT -= dt) <= 0) b.noPick = null;
   if (b.x < 0 || b.x > W || b.y < 0 || b.y > H) return outOfPlay();
   for (const p of G.P) {                                       // pick-ups and interceptions
@@ -294,7 +324,7 @@ function ballStep(dt) {
       if (b.rolls && b.rolls.has(p)) pop(p.x, p.y - 2, 'INTERCEPTED', '#ff6b6b');
       own(p); p.runTo = null;
       if (G.oneTwo && p === G.oneTwo.b) { const o = G.oneTwo; later(.2, () => { if (G.oneTwo === o && G.ball.owner === o.b) oneTwoBack(o); }); }
-      if (p.team === 0 && keeperOf(1).down > G.t && distToGoal(p) < 26) G.chain = true;   // a rebound: the shot decision comes at once
+      if (p.team === 0 && keeperDown(keeperOf(1)) > .05 && distToGoal(p) < 26) G.chain = true;   // a rebound: the shot decision comes at once
       if (p.team === 0 && G.lastPasser && G.lastPasser !== p) G.assistFrom = G.lastPasser;
       return;
     }
@@ -325,7 +355,7 @@ async function shotEnd(s) {
     return;
   }
   G.slow = 1; G.afterGoal = null;
-  if (s.out === 'parry') { b.vx = (b.x > GX ? 1 : -1) * rnd(5, 9); b.vy = (s.gy === 0 ? 1 : -1) * rnd(6, 10); b.vz = 2; b.noPick = s.gk; b.noPickT = .5; pop(s.gk.x, s.gk.y + (s.gy ? -2 : 2), 'PARRIED! KEEPER DOWN', '#fff'); s.gk.stun = 1; s.gk.down = G.t + KEEPER_DOWN; burst(b.x, b.y, 16, '#fff', 6); }
+  if (s.out === 'parry') { b.vx = (b.x > GX ? 1 : -1) * rnd(5, 9); b.vy = (s.gy === 0 ? 1 : -1) * rnd(6, 10); b.vz = 2; b.noPick = s.gk; b.noPickT = .5; s.gk.stun = 1; if (!s.reb) { s.gk.downT = G.t; pop(s.gk.x, s.gk.y + (s.gy ? -2 : 2), 'PARRIED! KEEPER DOWN', '#fff'); } else { s.gk.downT = 0; pop(s.gk.x, s.gk.y + (s.gy ? -2 : 2), 'DOUBLE SAVE!', '#fff'); } burst(b.x, b.y, 16, '#fff', 6); }   // one rebound per attack
   else if (s.out === 'catch') { own(s.gk); pop(s.gk.x, s.gk.y + (s.gy ? -2 : 2), 'SAVED!', '#fff'); later(.9, () => { if (G.ball.owner === s.gk) distribute(s.gk); }); }
   else { pop(b.x, s.gy + (s.gy ? -2 : 2), 'WIDE!', '#ddd'); b.vx = b.vy = 0; G.goalKick = true;
     setTimeout(() => G && cut(() => { G.goalKick = false; const gk = s.gk; gk.x = GX; gk.y = s.gy === 0 ? 5 : H - 5; own(gk); later(.9, () => { if (G.ball.owner === gk) distribute(gk); }); }), 500 / FAST); }
@@ -395,16 +425,16 @@ function contactTackles(dt) {
 const marked = q => foes(q).filter(f => f.role !== 'GK' && dist(f, q) < 3.5).length;
 const shortTarget = p => AI.bestPass(p, 'pass');            // the best short pass by the same expected-value search the AI uses
 const longTarget = p => AI.bestPass(p, 'long');
-const longChance = p => clamp(.5 + ((p.st.pass || 9) - 10) * .04 - tiredPen(p), .2, .88);
+const longChance = p => clamp(.5 + (rv(p, 'pass') - 10) * .04 - tiredPen(p), .2, .88);
 function passLong(p, t) { passLongTo(p, t.x + t.vx * .6, t.y - (p.team === 0 ? 4 : -4), t); }
-function passLongTo(p, tx0, ty0, runner) {                   // lofted ball over the defenders: rolled honestly; a miss lands a few metres off
+function passLongTo(p, tx0, ty0, runner, label = 'LONG BALL!') {                   // lofted ball over the defenders: rolled honestly; a miss lands a few metres off
   const b = G.ball, ok = Math.random() < longChance(p), off = ok ? rnd(0, 1.5) : rnd(5, 8), a = rnd(Math.PI * 2);
   const tx = clamp(tx0 + Math.cos(a) * off, 2, W - 2), ty = clamp(ty0 + Math.sin(a) * off, 3, H - 3);
   atFeet(b, p, tx, ty); const d = Math.hypot(tx - b.x, ty - b.y) || 1, sp = clamp(14 + d * .3, 16, 28), T = d / sp;
   b.owner = null; b.vx = (tx - b.x) / d * sp; b.vy = (ty - b.y) / d * sp; b.vz = 9.8 * T / 2; b.z = .3; b.air = true;
   b.noPick = p; b.noPickT = .4; b.last = p; b.rolls = null; audDir(p, ty); if (runner) runner.runTo = { x: tx, y: ty, until: G.t + T + 1 };
   p.en = Math.max(0, p.en - 4); G.lastPasser = p; snd('kick');
-  pop(p.x, p.y - 2, ok ? 'LONG BALL!' : 'OVERHIT...', ok ? '#8fd8ff' : '#ddd');
+  pop(p.x, p.y - 2, ok ? label : 'OVERHIT...', ok ? '#8fd8ff' : '#ddd');
 }
 function passCut(p, mate) {                                   // a lost pass in a scene: played, and read by the defender nearest the lane
   const f = foes(p).filter(q => q.stun <= 0 && q.role !== 'GK').sort((a, c) => laneD(a, p, mate) - laneD(c, p, mate))[0];
@@ -440,7 +470,7 @@ function passSpace(p, tx, ty) {
   if (sc.lofted) return passLongTo(p, tx, ty, sc.who);
   const [jx, jy] = jitter(p, tx, ty, Math.hypot(tx - p.x, ty - p.y)), b = G.ball;
   passPoint(p, jx, jy);
-  b.rolls = new Map(foes(p).map(q => [q, Math.random() < clamp(.2 + ((q.st.tackle || 8) - (p.st.pass || 9)) * .04, .05, .6)]));
+  b.rolls = new Map(foes(p).map(q => [q, Math.random() < clamp(.2 + ((q.st.tackle ?? G.L) - (p.st.pass ?? G.L)) * .04, .05, .6)]));
   if (sc.who) sc.who.runTo = { x: jx, y: jy, until: G.t + 3 };
   p.en = Math.max(0, p.en - 3); G.lastPasser = p; pop(p.x, p.y - 2, 'INTO SPACE!', '#8fd8ff');
 }
@@ -460,7 +490,7 @@ function oneTwo(p, m, safe) {
 }
 function oneTwoBack(o) {
   const b = G.ball; passPoint(o.b, o.tx, o.ty); o.back = true; G.lastPasser = o.b; if (o.a.team === 0) G.ctrl = o.a;
-  if (!o.safe) b.rolls = new Map(foes(o.b).map(q => [q, Math.random() < clamp(.2 + ((q.st.tackle || 8) - (o.b.st.pass || 9)) * .04, .05, .6)]));
+  if (!o.safe) b.rolls = new Map(foes(o.b).map(q => [q, Math.random() < clamp(.2 + ((q.st.tackle ?? G.L) - (o.b.st.pass ?? G.L)) * .04, .05, .6)]));
   pop(o.b.x, o.b.y - 2, 'ONE-TWO!', '#ffd23f');
 }
 // STEER IN: keep the ball and run closer; the game stops again for the shot (owner, 26 Nov: "option to steer more and shoot with better chance")
@@ -468,6 +498,26 @@ function steerSpot(p) { const d = distToGoal(p), d2 = Math.max(9, d - 12), k = 1
 function chanceAt(p, x, y, special) { const ox = p.x, oy = p.y; p.x = x; p.y = y; const c = shotChance(p, keeperOf(1 - p.team), special); p.x = ox; p.y = oy; return bonuses({ ch: c, kind: 'shot', special }, p).ch; }   // same boosts as the shot stop
 function steerGain(p, special) { if (distToGoal(p) < 12) return null; const s = steerSpot(p), now = angleOk(p) ? chanceAt(p, p.x, p.y, special) : 0, then = chanceAt(p, s.x, s.y, special); return then - now >= .05 ? then : null; }
 function steerIn(p) { G.steerIn = { until: G.t + 4.5 }; G.chain = false; setHint('Steer in! The game stops again for your shot (or tap SHOOT).', 3500); pop(p.x, p.y - 2, 'STEER IN!', '#8fd8ff'); }
+// CROSSES (owner, 26 Nov: "allow strategy: long pass from the wings and shoot"): from out wide near their box, a lofted ball onto a
+// teammate in the box. The landing is rolled like any long ball; if it drops onto him, he heads or volleys it (a real decision).
+const isWide = p => Math.abs(p.x - GX) > 13 && Math.abs(goalY(p.team) - p.y) < 40;
+function crossSpot(q) {                                       // where a cross to q should drop: in front of him, inside the box
+  const gy = goalY(q.team), dy = Math.abs(gy - q.y); if (dy > 26 || Math.abs(q.x - GX) > 17) return null;
+  const s = gy === 0 ? 1 : -1;
+  return { x: clamp(q.x + q.vx * .6, GX - 8, GX + 8), y: gy + s * clamp(dy - 1.5 + (q.vy * s) * .6, 7, 17) };
+}
+function crossOpts(p) {
+  if (!isWide(p)) return [];
+  return G.P.filter(q => q.team === p.team && q !== p && q.role !== 'GK' && q.stun <= 0).map(q => { const s = crossSpot(q); return s && { q, x: s.x, y: s.y, p: clamp(AI.passSuccess(p, s.x, s.y, true) - tiredPen(p) * .5, .05, .9) }; })
+    .filter(Boolean).sort((a, c) => (c.p + (c.q === G.hero ? .08 : 0)) - (a.p + (a.q === G.hero ? .08 : 0)));
+}
+function crossTo(p, q) {
+  const s = crossSpot(q) || { x: q.x, y: q.y }; passLongTo(p, s.x, s.y, q, 'CROSS!'); G.ball.cross = { to: q }; audN('cross' + p.team);
+}
+function aerial(q) {                                           // the cross reached q in the air
+  if (q.team === 0) return openScene('aerial', { me: q, them: keeperOf(1) });
+  G.paused = true; G.since = 0; setTimeout(() => { if (G && !G.over) { G.paused = false; rivalShot(q, false); } }, 0);   // their header: your keeper decides
+}
 function tackleNow(p) {
   const c = G.ball.owner; if (!c || c.team === p.team || dist(p, c) > 3.2) return;
   const ch = clamp(chance(p.st.tackle, c.st.dribble) - (dist(p, c) > 1.6 ? .1 : 0) - tiredPen(p) + tiredPen(c), .05, .9);
@@ -489,7 +539,7 @@ function director() {
     const s = G.steerIn;
     if (b.owner !== c || c.team !== 0) G.steerIn = null;
     else if (G.t > s.until || distToGoal(c) < 10) { G.steerIn = null;
-      if (distToGoal(c) < 28 && angleOk(c)) { audN('steer_stop'); return openScene('shot', { me: c, them: keeperOf(1) }); }
+      if (distToGoal(c) < 24 && angleOk(c)) { audN('steer_stop'); return openScene('shot', { me: c, them: keeperOf(1), steered: true }); }
       setHint('No angle from here. Steer back inside, or pass.', 3000); }
     else return;
   }
@@ -522,7 +572,7 @@ function freeKick(fouler) {                                   // a foul on Kai n
     const k = 9.15 / Math.hypot(GX - x, y) , wx = x + (GX - x) * k, wy = y - y * k;   // the wall: 9.15 m towards goal
     foes(c).filter(q => q.role === 'DF').forEach((q, i) => { q.x = wx + (i - 1.5) * 1.3; q.y = wy; });
     const mo = G.mo; mo.x = clamp(x + (x < GX ? 6 : -6), 4, W - 4); mo.y = y - 4;
-    addSp(30);
+    addSp(15);
   }, 700, true);
   setTimeout(() => { if (G && !G.over) { G.paused = false; openScene('freekick', { me: c, them: keeperOf(1), fouler }); } }, 900 / FAST);
 }
@@ -649,9 +699,14 @@ function hud() {
     const ours = free && b.owner === p && p.team === 0;
     G.tg = ours ? { s: stickyTarget('s', fwdFirst(p, AI.rankPass(p, 'pass')), now), l: stickyTarget('l', fwdLong(p, AI.rankPass(p, 'long')), now) } : null;
     const sp = G.tg && G.tg.s && (G.tgSel.sObj || {}).p;
-    setBtn('bShoot', ours && distToGoal(p) < 34 && angleOk(p), `${Math.round(clamp(shotChance(p, keeperOf(1), false) - tiredPen(p), .03, .9) * 100)}%${keeperOf(1).down > G.t ? ' · KEEPER DOWN' : ''}`);
+    const spec = ours && p === G.hero && G.since > .3 ? bestSpecial(p) : null; G.specKey = spec && spec.k;
+    setBtn('bSpec', !!spec, spec ? `${Math.round(spec.ch * 100)}% · ${Math.round(distToGoal(p))}m` : '');
+    if (spec) { const b = $('bSpec'), nm = SPECIALS[spec.k].name.split(' ')[0]; if (b.firstChild.textContent !== nm) b.firstChild.textContent = nm; b.classList.toggle('mt', spec.k === 'meteor'); }
+    setBtn('bShoot', ours && distToGoal(p) < 34 && angleOk(p), `${Math.round(clamp(shotChance(p, keeperOf(1), false) - tiredPen(p), .03, .9) * 100)}%${keeperDown(keeperOf(1)) ? ' · KEEPER DOWN' : ''}`);
     setBtn('bPass', ours && !!G.tg.s, G.tg && G.tg.s ? `→ ${G.tg.s.name}${sp ? ` ${Math.round(sp * 100)}%` : ''}` : '');
-    setBtn('bLong', ours && !!G.tg.l, G.tg && G.tg.l ? `${G.tg.l.name} ${Math.round(longChance(p) * 100)}%` : '');
+    const cr = ours ? crossOpts(p)[0] || null : null; G.crossT = cr;
+    const lb = $('bLong'), lt = cr ? 'CROSS' : 'LONG'; if (lb.firstChild.textContent !== lt) lb.firstChild.textContent = lt;
+    setBtn('bLong', ours && (!!cr || !!G.tg.l), cr ? `${cr.q.name} ${Math.round(cr.p * 100)}%` : G.tg && G.tg.l ? `${G.tg.l.name} ${Math.round(longChance(p) * 100)}%` : '');
     const car = b.owner, near = free && car && car.team === 1 && p.team === 0 && p.role !== 'GK' && p.stun <= 0 && dist(p, car) < 7;
     setBtn('bTackle', near, near ? `${Math.round(clamp(chance(p.st.tackle, car.st.dribble) - (dist(p, car) > 1.6 ? .1 : 0) - tiredPen(p) + tiredPen(car), .05, .9) * 100)}%${dist(p, car) > 3.2 ? ' · closer!' : ''}` : '', near && dist(p, car) > 3.2);
   }
@@ -659,8 +714,8 @@ function hud() {
   $('clock').textContent = `${Math.min(90, Math.floor(G.t / G.len * 90))}'`;
   const bar = $('sp').firstElementChild, cost = specCost(), ready = G.sp >= cost;
   bar.style.width = (G.sp / G.spMax * 100) + '%'; bar.classList.toggle('ready', ready);
-  const wins = Math.ceil((cost - G.sp) / spGain());
-  $('spt').textContent = ready ? 'SPECIAL READY!' : wins <= 1 ? '1 more win → SPECIAL' : `${wins} wins → SPECIAL`;
+  const wins = Math.ceil((cost - G.sp) / spGain()), n = Math.floor(G.sp / cost);
+  $('spt').textContent = ready ? `SPECIAL ×${n}` : wins <= 1 ? '1 more win → SPECIAL' : `${wins} wins → SPECIAL`;
 }
 // the PASS / LONG target must not flicker between players while you decide: keep it for at least 0.9 s unless another is clearly better
 function stickyTarget(k, list, now) {
@@ -675,12 +730,19 @@ function fwdFirst(p, list) {
   return f.length ? [...f, ...list.filter(o => !f.includes(o))].map((o, i) => i ? o : { ...o, v: Math.max(o.v, list[0].v) }) : list;
 }
 const fwdLong = (p, list) => list.filter(o => p.y - o.q.y > 6);   // a LONG PASS goes forward, never 25 m back to a defender (owner, 26 Nov)
-const spGain = () => 9 * (1 + (save.stats.spirit - 10) * .04);
+const spGain = () => 3;                                    // a won duel gives a little Spirit back
 
 const armed = id => G && !G.paused && performance.now() - ($(id).onAt || 0) > 350 && G.t - (G.ownT || 0) > .3 * FAST;
 $('bShoot').onclick = () => { const p = G && G.ctrl; if (p && G.ball.owner === p && armed('bShoot')) { shootNow(p); G.stat.free++; } };
 $('bPass').onclick = () => { const p = G && G.ctrl; if (p && G.ball.owner === p && armed('bPass')) { const t = G.tg && G.tg.s; if (t) { pass(p, t); p.en = Math.max(0, p.en - 2); } } };
-$('bLong').onclick = () => { const p = G && G.ctrl; if (p && G.ball.owner === p && armed('bLong')) { const t = G.tg && G.tg.l; if (t) passLong(p, t); } };
+$('bLong').onclick = () => { const p = G && G.ctrl; if (p && G.ball.owner === p && armed('bLong')) { if (G.crossT) { crossTo(p, G.crossT.q); G.stat.free++; return; } const t = G.tg && G.tg.l; if (t) passLong(p, t); } };
+$('bSpec').onclick = () => { const p = G && G.ctrl; if (p && G.ball.owner === p && armed('bSpec') && G.specKey) { G.stat.free++; openScene('shot', { me: p, them: keeperOf(1), auto: G.specKey }); } };
+function bestSpecial(p) {                                     // the in-play special button: the strongest special Kai can pay for from here
+  if (distToGoal(p) > SPEC_RANGE || !specAngleOk(p)) return null;
+  let best = null;
+  for (const k of unlockedSpecials()) { if (G.sp < shotCost(k) || p.en < EN[k]) continue; const ch = bonuses({ ch: shotChance(p, keeperOf(1), k), special: true, kind: 'shot' }, p).ch; if (!best || ch > best.ch + .04) best = { k, ch }; }
+  return best;
+}
 $('bTackle').onclick = () => { const p = G && G.ctrl; if (p && armed('bTackle')) tackleNow(p); };
 let last = 0;
 function loop(now) {

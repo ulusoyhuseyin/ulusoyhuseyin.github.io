@@ -39,14 +39,17 @@ function planInfo() {
       .sort((a, b) => (a.behind - b.behind) || (b.p - a.p));   // a one-two goes with a man beside or ahead of you; behind only if nobody else
     info.o2 = sel ? o2.find(x => x.q === sel.q) || null : o2[0] || null;
     info.o2why = sel ? `${sel.q.name} is too far · max 20 m` : 'nobody within 20 m';
-    info.steer = distToGoal(car) < 36 && angleOk(car) ? steerGain(car, false) : null;
+    const cr = crossOpts(car); info.cross = (sel && cr.find(c => c.q === sel.q)) || cr[0] || null;
+    info.steer = distToGoal(car) < 36 && angleOk(car) && !G.steerIn ? steerGain(car, false) : null;
     info.best = best; info.car = car;
     info.shot = angleOk(car) && distToGoal(car) < 34 ? clamp(shotChance(car, keeperOf(1), false) - tiredPen(car), .03, .8) : null;
     // the special shot: always listed, with the honest reason when it can't be used yet (owner, 26 Nov: shoot, special shoot and long pass in PLAN)
-    const cost = specCost(), d = Math.round(distToGoal(car));
-    info.spec = car !== G.hero ? { why: `only ${G.hero.name} has one` } : G.sp < cost ? { why: `need ${cost} spirit · have ${Math.floor(G.sp)}` }
-      : car.en < EN.comet ? { why: `too tired · need ⚡${EN.comet}` } : d >= 30 ? { why: `${d} m · get within 30 m` } : !angleOk(car) ? { why: 'no angle · move inside' }
-      : { ch: bonuses({ ch: shotChance(car, keeperOf(1), true), special: true }, car).ch };
+    const d0 = distToGoal(car), d = Math.round(d0);
+    info.specs = unlockedSpecials().map(k => { const cost = shotCost(k);
+      const why = car !== G.hero ? `only ${G.hero.name} has one` : G.sp < cost ? `need ${cost} spirit · have ${Math.floor(G.sp)}` : car.en < EN[k] ? `too tired · need ⚡${EN[k]}`
+        : d0 > SPEC_RANGE ? `${d} m · get within ${SPEC_RANGE} m` : !specAngleOk(car) ? 'no angle · move inside' : null;
+      return { k, cost, why, ch: why ? null : bonuses({ ch: shotChance(car, keeperOf(1), k), special: true, kind: 'shot' }, car).ch }; });
+    if (car !== G.hero) info.specs = info.specs.slice(0, 1);
     info.foe = foes(car).filter(f => f.role !== 'GK' && f.stun <= 0).sort((a, d) => dist(a, car) - dist(d, car))[0];
   } else if (info.mode === 'defend') {
     info.car = car;
@@ -60,7 +63,7 @@ function planBar() {
     b.innerHTML = `${label}<small>${sub}</small>`; if (cls) b.className = cls; b.disabled = !!off; b.dataset.n = n; if (k) b.dataset.k = k; b.onclick = fn; acts.appendChild(b); };
   acts.innerHTML = ''; const tg = $('plantg'); tg.innerHTML = ''; tg.style.display = info.mode === 'attack' && info.targets.length ? 'flex' : 'none';
   if (info.mode === 'attack') {
-    const car = info.car, bestTxt = info.best.kind === 'pass' || info.best.kind === 'long' ? `pass to ${info.best.q.name}` : info.best.kind === 'shoot' ? 'shoot' : info.best.kind === 'dribble' ? 'keep running' : 'hold it';
+    const car = info.car, bestTxt = info.best.kind === 'cross' ? `cross to ${info.best.q.name}` : info.best.kind === 'pass' || info.best.kind === 'long' ? `pass to ${info.best.q.name}` : info.best.kind === 'shoot' ? 'shoot' : info.best.kind === 'dribble' ? 'keep running' : 'hold it';
     const pct = p => `${Math.round(p * 100)}%`, d = Math.round(distToGoal(car)), sel = info.sel;
     $('planhint').innerHTML = PLAN.spot ? `Pass into space: <b>${pct(PLAN.spot.p)}</b> · ${PLAN.spot.who ? PLAN.spot.who.name + ' runs for it' : ''}. Tap the spot again to play it.`
       : sel ? `<b>${sel.q.name}</b> picked: ${sel.kind === 'long' ? 'LONG PASS' : 'PASS'} ${pct(sel.p)}. Tap him again to play it, or pick a button.`
@@ -73,9 +76,10 @@ function planBar() {
     const ls = !sel && info.longSpace;
     if (info.long || !ls) btn('LONG PASS', info.long ? `→ ${info.long.q.name} ${pct(info.long.p)}` : 'nobody far ahead · use PASS', () => { planClose(); passLong(car, info.long.q); G.stat.free++; }, 'lg', !info.long, 'L');
     else btn('LONG PASS', `into space · ${ls.who.name} ${pct(ls.p)}`, () => { PLAN.spot = null; planClose(); passSpace(car, ls.x, ls.y); G.stat.free++; }, 'lg', false, 'L');
+    if (info.cross) btn('CROSS', `→ ${info.cross.q.name} ${pct(info.cross.p)} · header or volley`, () => { planClose(); audN('plan_cross'); crossTo(car, info.cross.q); G.stat.free++; }, 'lg', false, 'X');
     btn('SHOOT', info.shot !== null ? `${pct(info.shot)} · ${d} m${keeperDown(keeperOf(1)) ? ' · KEEPER DOWN' : ''}` : d >= 34 ? `${d} m · get closer` : 'no angle · move inside', () => { planClose(); shootNow(car); G.stat.free++; }, '', info.shot === null, 'K');
-    btn('SPECIAL SHOT', info.spec.ch ? `COMET DRIVE ${pct(info.spec.ch)} · ${specCost()} spirit` : info.spec.why,
-      () => { planClose(); openScene('shot', { me: car, them: keeperOf(1), auto: 'comet' }); }, 'sp', !info.spec.ch);
+    for (const s of info.specs) btn(car === G.hero ? SPECIALS[s.k].name : 'SPECIAL SHOT', s.ch ? `${pct(s.ch)} · ${s.cost} spirit · ${d} m` : s.why,
+      () => { planClose(); openScene('shot', { me: car, them: keeperOf(1), auto: s.k }); }, 'sp' + (s.k === 'meteor' ? ' mt' : ''), !s.ch);
     btn('ONE-TWO', info.o2 ? `with ${info.o2.q.name} ${pct(info.o2.p)} · he plays it back` : info.o2why,
       () => { planClose(); audN('plan_onetwo'); oneTwo(car, info.o2.q); G.stat.free++; }, 'o2', !info.o2, 'O');
     if (info.steer) btn('STEER IN', `run closer · stops at ~${pct(info.steer)}`, () => { planClose(); audN('plan_steer'); steerIn(car); });
@@ -133,6 +137,9 @@ function drawPlan(c) {
     }
     if (info.shot !== null) { const [gx, gy] = W2S(GX, 0); pill(c, gx, gy + 18, `${info.best.kind === 'shoot' ? '★ ' : ''}SHOOT ${Math.round(info.shot * 100)}%`, info.best.kind === 'shoot' ? '#ffd23f' : '#fff', true); }
     c.strokeStyle = `rgba(255,210,63,${pulse})`; c.lineWidth = 3; c.beginPath(); c.arc(cx, cy, 26, 0, 7); c.stroke();
+    const cr = info.cross;
+    if (cr) { const [x, y] = W2S(cr.x, cr.y); c.strokeStyle = '#8fd8ff'; c.lineWidth = 3; c.setLineDash([4, 5]); c.beginPath(); c.moveTo(cx, cy); c.quadraticCurveTo((cx + x) / 2, Math.min(cy, y) - 60, x, y); c.stroke(); c.setLineDash([]);
+      c.beginPath(); c.arc(x, y, 12 + 3 * pulse, 0, 7); c.stroke(); pill(c, x, y + 26, `CROSS ${Math.round(cr.p * 100)}%`, '#8fd8ff'); }
     const ls = info.longSpace;
     if (ls && !PLAN.spot) { const [x, y] = W2S(ls.x, ls.y), [rx, ry] = W2S(ls.who.x, ls.who.y), col = ls.p >= .65 ? '#7dff9a' : ls.p >= .45 ? '#ffe27a' : '#ff8a7a';
       c.strokeStyle = col; c.globalAlpha = .8; c.lineWidth = 2; c.setLineDash([8, 6]); c.beginPath(); c.moveTo(cx, cy); c.lineTo(x, y); c.stroke();
@@ -178,7 +185,7 @@ addEventListener('keydown', e => {
     if (b && !b.disabled) b.click(); return;
   }
   const click = id => { const b = $(id); if (b && b.classList.contains('on')) b.click(); };
-  if (e.code === 'KeyK') click('bShoot'); else if (e.code === 'KeyJ') click('bPass'); else if (e.code === 'KeyL') click('bLong'); else if (e.code === 'KeyH') click('bTackle');
+  if (e.code === 'KeyC') click('bSpec'); else if (e.code === 'KeyK') click('bShoot'); else if (e.code === 'KeyJ') click('bPass'); else if (e.code === 'KeyL') click('bLong'); else if (e.code === 'KeyH') click('bTackle');
 });
 addEventListener('keyup', e => { if (HELD.delete(e.code)) keySteer(); });
 addEventListener('blur', () => { HELD.clear(); keySteer(); });
@@ -194,6 +201,7 @@ function botFree(dt) {
     else if (r < .4 && on('bPass')) $('bPass').click();
     else if (r < .5 && on('bShoot')) $('bShoot').click();
     else if (r < .55 && on('bLong')) $('bLong').click();
+    else if (r < .62 && on('bSpec')) $('bSpec').click();
   } else if (r < .4 && on('bTackle')) $('bTackle').click();
 }
 function botPlan() {                                          // the test robot in PLAN: buttons, picked targets, taps on teammates

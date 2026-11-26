@@ -35,28 +35,28 @@ const AI = (() => {
       let ds, t;
       if (lofted) { ds = Math.hypot(f.x - tx, f.y - ty); t = 1; if (ds > 4) continue; }   // a lofted ball can only be won where it lands
       else { [ds, t] = segDist(f.x, f.y, p.x, p.y, tx, ty); if (ds > 3.2) continue; }
-      const reach = (1 - ds / (lofted ? 4 : 3.2)) * (.35 + t * .3), skill = clamp(.6 + ((f.st.tackle || 8) - (p.st.pass || 9)) * .04, .25, .95);
+      const reach = (1 - ds / (lofted ? 4 : 3.2)) * (.35 + t * .3), skill = clamp(.6 + ((f.st.tackle ?? G.L) - (p.st.pass ?? G.L)) * .04, .25, .95);
       ok *= 1 - reach * skill;
     }
     const d = Math.hypot(tx - p.x, ty - p.y);
-    ok *= lofted ? clamp(.5 + ((p.st.pass || 9) - 10) * .04, .2, .88) + .12 : 1 - Math.max(0, d - 20) * .02;
+    ok *= lofted ? clamp(.5 + (rv(p, 'pass') - 10) * .04, .2, .88) + .12 : 1 - Math.max(0, d - 20) * .02;
     return clamp(ok, 0, 1);
   }
   function xg(q, x, y) {
     const d = Math.hypot(x - GX, atkGoalY(q.team) - y), gk = keeperOf(1 - q.team);
     const fake = { x, y, team: q.team }; if (d > 28 || !angleOk(fake)) return 0;
     const kd = keeperDown(gk);   // a keeper on the ground after a parry: they shoot on the rebound too
-    return clamp(chance(q.st.shoot || 8, (gk.st.catch || 9) + 2.5) - Math.max(0, d - 13) * .018 - anglePen(fake) + kd, .03, .8 + kd / 2);
+    return clamp(chance(q.st.shoot ?? G.L, (gk.st.catch ?? G.L) + 2.5) - Math.max(0, d - 13) * .018 - anglePen(fake) + kd, .03, .8 + kd / 2);
   }
   function holdValue(q, x, y) {                               // having the ball as q at (x, y): position, space, or the shot from there
     return Math.max(posValue(q.team, x, y) - pressure(q.team, x, y) * .18, xg(q, x, y) * 2.2);
   }
-  function nearestTackle(p) { let best = 8, bd = 1e9; for (const f of G.P) if (f.team !== p.team && f.role !== 'GK') { const d = dist(f, p); if (d < bd) { bd = d; best = f.st.tackle || 8; } } return best; }
+  function nearestTackle(p) { let best = G.L, bd = 1e9; for (const f of G.P) if (f.team !== p.team && f.role !== 'GK') { const d = dist(f, p); if (d < bd) { bd = d; best = f.st.tackle ?? G.L; } } return best; }
   function options(p) {
     const team = p.team, dir = team === 0 ? -1 : 1, out = [], tk = nearestTackle(p);
     for (const a of [-1.1, -.7, -.35, 0, .35, .7, 1.1]) {      // dribbles: 7 directions, 5 m
       const tx = clamp(p.x + Math.sin(a) * 5, 3, W - 3), ty = clamp(p.y + dir * Math.cos(a) * 5, 2, H - 2);
-      const pr = pressure(team, (p.x + tx) / 2, (p.y + ty) / 2), keep = clamp(1 - pr * .32 * (1 + (tk - (p.st.dribble || 8)) * .05), .05, 1);
+      const pr = pressure(team, (p.x + tx) / 2, (p.y + ty) / 2), keep = clamp(1 - pr * .32 * (1 + (tk - (p.st.dribble ?? G.L)) * .05), .05, 1);
       out.push({ kind: 'dribble', tx, ty, p: keep, v: keep * holdValue(p, tx, ty) - (1 - keep) * lossCost(team, p.y) });
     }
     for (const q of G.P) {                                    // passes and long balls to every teammate
@@ -67,6 +67,8 @@ const AI = (() => {
       const feed = team === 1 && q === G.star ? .15 : 0;      // their team looks for its star (owner, 24 Nov)
       out.push({ kind: lofted ? 'long' : 'pass', q, p: ps, v: ps * holdValue(q, lx, ly) - (1 - ps) * lossCost(team, (p.y + ly) / 2) - (lofted ? .03 : 0) + fwd + feed });
     }
+    if (isWide(p)) for (const c of crossOpts(p))             // out wide near their box: a cross onto a man in the box (wing play, owner 26 Nov)
+      out.push({ kind: 'cross', q: c.q, p: c.p, v: c.p * holdValue(c.q, c.x, c.y) * 1.15 - (1 - c.p) * lossCost(team, p.y) + .14 });
     const x = xg(p, p.x, p.y); if (x > 0) out.push({ kind: 'shoot', p: x, v: x * 2.2 + (1 - x) * .1 });
     out.push({ kind: 'hold', p: 1, v: holdValue(p, p.x, p.y) - .05 });
     return out;
@@ -83,6 +85,7 @@ const AI = (() => {
       p.plan = choose(p); p.aiShoot = p.plan.kind === 'shoot';
       const settled = G.t - (G.ownT || 0) > .35;
       if (settled && p.plan.kind === 'pass') { pass(p, p.plan.q); G.stat.oppPasses = (G.stat.oppPasses || 0) + 1; p.plan = null; return; }
+      if (settled && p.plan.kind === 'cross') { crossTo(p, p.plan.q); G.stat.oppPasses = (G.stat.oppPasses || 0) + 1; p.plan = null; return; }
       if (settled && p.plan.kind === 'long') { passLong(p, p.plan.q); G.stat.oppPasses = (G.stat.oppPasses || 0) + 1; p.plan = null; return; }
     }
     const pl = p.plan; if (!pl) return;

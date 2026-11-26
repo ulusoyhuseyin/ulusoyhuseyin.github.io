@@ -4,7 +4,7 @@
 'use strict';
 
 const STYLES = {
-  striker: { name: 'STRIKER', special: 'COMET DRIVE', desc: 'Carry the ball and finish. Your shots +5%, and Comet Drive costs 50 Spirit instead of 60.', boost: { shoot: 3, spirit: 2 }, lean: ['shoot', 'spirit', 'dribble'] },
+  striker: { name: 'STRIKER', special: 'COMET DRIVE', desc: 'Carry the ball and finish. Your shots +5%, and Comet Drive costs 28 Spirit instead of 32: more of them per match.', boost: { shoot: 3, spirit: 2 }, lean: ['shoot', 'spirit', 'dribble'] },
   engine: { name: 'ENGINE', special: 'IRON CLAMP', desc: 'Win the ball back and launch counters. Gets a special tackle that always looks spectacular.', boost: { tackle: 4, speed: 2 }, lean: ['tackle', 'stamina', 'speed', 'spirit'] },
   playmaker: { name: 'PLAYMAKER', special: 'NEEDLE PASS', desc: 'Make Mo a star. One-twos get easier, and Needle Pass sends Mo through 1-on-1.', boost: { pass: 4, dribble: 1 }, lean: ['pass', 'dribble', 'spirit'] },
 };
@@ -16,7 +16,7 @@ const TSTATS = [
   ['tackle', '🛡️', 'TACKLE', 'Win the ball back'],
   ['speed', '💨', 'SPEED', 'Run faster. A fast sprint uses more energy'],
   ['stamina', '🔋', 'STAMINA', 'Get tired later, get your breath back faster'],
-  ['spirit', '🔥', 'SPIRIT', 'Your special bar fills faster'],
+  ['spirit', '🔥', 'SPIRIT', 'A bigger Spirit pool: more special shots per match (+4 each)'],
 ];
 // the next opponent's star talks during training, and the coach says which stats help (owner, 24 Nov): faces we already have
 const RIVAL_TALK = {
@@ -66,7 +66,7 @@ function startMatch() {
   show(null); newMatch(); snd('whistle');
   track('m_start', { m: G.m, style: save.style, lvl: save.lvl });
   if (G.tut) setHint('Drag anywhere to steer. Or just watch: the choices come to you.', 5000);
-  else setHint(`Match ${G.m} vs ${G.opp.name}`, 3000);
+  else setHint(`Match ${G.m} vs ${G.opp.name} · every player is level ${G.L} now`, 3500);
   if (G.m === 2) setTimeout(() => G && toast('ito', 'COACH ITO', 'Bruno wins plain duels. Go around him!', 4200), 1600);
   if (G.m === 3) setTimeout(() => G && toast('ren', 'REN', 'Show me that Comet Drive. I\'ll freeze it.', 4200), 1600);
 }
@@ -84,7 +84,7 @@ function finish() {
   const real = Math.round((performance.now() - G.real0) / 1000);
   const inRange = st.chances.filter(c => c >= 45 && c <= 75).length;
   const summary = { len: G.opp.len, pace: PACE, free: st.free || 0, oppPasses: st.oppPasses || 0, m, res, score: `${a}-${b}`, grade, dec: st.dec, won: st.won, perfect: st.perfect, good: st.good, upset: st.upset, specials: st.specials, goals: st.goals, assists: st.assists, real, think: Math.round(st.think || 0), oddsBand: st.chances.length ? Math.round(inRange / st.chances.length * 100) : 0, steered: !!G.touched };
-  window.LAST = { ...summary, chances: st.chances, gaps: st.gaps, kinds: st.kinds };
+  window.LAST = { ...summary, chances: st.picks || st.chances, gaps: st.gaps, kinds: st.kinds };
   track('m_end', summary);
   save.plays = (save.plays || 0) + 1; save.rec.push({ m, res, a, b, grade });
   // XP, with one guaranteed level-up per season-1 match and a head start on the next bar (R6)
@@ -103,6 +103,7 @@ function finish() {
     <p class="bang" style="font-size:26px">+<span id="xpn">0</span> XP${bonus ? ` <span style="font-size:16px;opacity:.8">(+ match bonus)</span>` : ''}</p>
     <div class="xp"><i id="xpb" style="width:${xp0 / need0 * 100}%"></i></div>
     <p id="lvl" class="small">LV ${lv0}</p>
+    ${growthCard(m)}
     <p class="small" style="max-width:360px">${res === 'l' ? 'A loss still makes you stronger. Try again, or keep going. ' : ''}${m === 1 ? 'Next: <b>Iron Valley</b>. Their centre-back <b>Bruno</b> is called "the Wall".' : m === 2 ? 'Next: <b>Storm Academy</b>. <b>Ren</b> is waiting.' : 'Next: <b>Kings of Sand</b>, then the Final against <b>Sora</b>.'}</p>
     <div style="display:flex;gap:10px;flex-wrap:wrap;justify-content:center">${res === 'l' ? '<button class="btn alt" id="rematch">REMATCH</button>' : ''}<button class="btn" id="cont">CONTINUE</button></div>`;
   show('result');
@@ -118,6 +119,15 @@ function finish() {
   $('cont').onclick = () => { $('cont').onclick = null; advance(); };
   if ($('rematch')) $('rematch').onclick = () => startMatch();
   botGo($('cont'), 2200);
+}
+
+// what got stronger (owner, 26 Nov: "you should be able to see the difference in each game")
+function growthCard(m) {
+  if (m >= OPPS.length) return '';
+  const L0 = leagueOf(m), L1 = leagueOf(m + 1), pool = spMaxOf(), n = Math.floor(pool / specCost()), unlock = Object.entries(SPECIALS).find(([, S]) => S.lvl === save.lvl);
+  return `<div class="grow"><b>EVERYONE GETS STRONGER</b><span>Every player, on both teams: level <b>${L0} → ${L1}</b> (+${L1 - L0} in every stat)</span>
+    <span>${save.name}: <b>LV ${save.lvl}</b> · Spirit pool <b>${pool}</b> = <b>${n} × ${SPECIALS.comet.name}</b> per match</span>
+    ${unlock ? `<span class="new">NEW SPECIAL SHOT: <b>${unlock[1].name}</b> · stronger from far · ${unlock[1].cost} spirit</span>` : ''}</div>`;
 }
 
 // ---------------------------------------------------------------- style choice (after match 1)
@@ -155,10 +165,11 @@ function training(then, doneLabel = 'NEXT MATCH ▶') {
     t.innerHTML = `<h2 class="bang">TRAINING</h2>${rival}
       <div class="tphead"><img src="img/face_kai.jpg" alt=""><div><b>${save.name}</b> · LV ${save.lvl}<br><span class="small">${save.style ? STYLES[save.style].name : 'ROOKIE'}</span></div>
         <span class="pts ${save.tp ? '' : 'zero'}">★ ${save.tp} POINT${save.tp === 1 ? '' : 'S'}</span></div>
-      <p class="small">${save.tp ? 'Tap <b>+</b> to make ' + save.name + ' stronger. ★ = good for your style.' : 'All points spent. You get more after every match.'}</p>
+      <p class="small">${save.tp ? 'Tap <b>+</b> to make ' + save.name + ' stronger. ★ = good for your style.' : 'All points spent. You get more after every match.'}
+        Next match an ordinary player has <b>${leagueOf(save.match)}</b> in every stat. Spirit pool <b>${spMaxOf()}</b> = ${Math.floor(spMaxOf() / specCost())} specials.</p>
       <div class="trows">${TSTATS.map(([k, ic, nm, ds]) => { const v = save.stats[k], c = tcost(v), gain = v - start[k], lw = lean.includes(k);
         return `<div class="trow${lw ? ' lean' : ''}"><span class="ic">${ic}</span>
-          <span class="nm">${nm}${lw ? ' ★' : ''} <b>${Math.round(v)}</b>${gain ? `<span class="up">+${gain}</span>` : ''}<span class="bar"><i style="width:${(v - gain) / TMAX * 100}%;float:left"></i><i class="new" style="width:${gain / TMAX * 100}%;float:left"></i></span></span>
+          <span class="nm">${nm}${lw ? ' ★' : ''} <b>${k === 'spirit' ? spMaxOf() : Math.round(kaiStats(save.match)[k] * 10) / 10}</b>${gain ? `<span class="up">+${k === 'spirit' ? gain * 4 : gain}</span>` : ''}<span class="bar"><i style="width:${(v - gain) / TMAX * 100}%;float:left"></i><i class="new" style="width:${gain / TMAX * 100}%;float:left"></i></span></span>
           <span class="ds">${ds}</span>
           <button class="plus" data-k="${k}" ${save.tp < c || v >= TMAX ? 'disabled' : ''}>+<small>${c} PT${c > 1 ? 'S' : ''}</small></button></div>`; }).join('')}</div>
       <div class="tfoot">${changed ? '<button class="btn alt" id="tundo">UNDO</button>' : ''}${drilled ? '' : '<button class="btn alt" id="tdrill">BONUS DRILL</button>'}<button class="btn" id="tdone">${doneLabel}</button></div>

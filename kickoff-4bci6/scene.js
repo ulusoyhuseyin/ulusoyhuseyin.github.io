@@ -5,20 +5,29 @@
 
 const chance = (a, b, k = .035) => clamp(.5 + (a - b) * k, .08, .92);
 // a parried shot leaves the keeper on the ground for a moment: the next quick shot is easier (owner, 26 Nov). Same rule for both teams.
-const KEEPER_DOWN = 2.6, keeperDown = gk => gk && gk.down > G.t ? .2 : 0;
-function shotChance(p, gk, special) {
-  const d = distToGoal(p), kd = keeperDown(gk);
-  let c = chance(p.st.shoot, gk.st.catch + 2.5) - Math.max(0, d - 13) * .018 - anglePen(p) + (save.style === 'striker' && p === G.hero ? .05 : 0) + kd;
-  if (special) c += .3;
-  return clamp(c, .08, (special ? .9 : .8) + kd / 2);
+// The first save is pure skill; a quick second shot meets a keeper who is still getting up (owner, 26 Nov): up to −30% at once,
+// fading to nothing; a better keeper (CATCH above the league level) is back up sooner. Same for both teams.
+const keeperRec = gk => clamp(3 - (rv(gk, 'catch') - 10) * .15, 1.6, 3.6);
+function keeperDown(gk) { if (!gk || !gk.downT) return 0; const u = (G.t - gk.downT) / keeperRec(gk); return u >= 0 && u < 1 ? Math.round(.3 * (1 - u) * 100) / 100 : 0; }
+function shotChance(p, gk, special) {                           // special: false, true (= comet) or a SPECIALS key
+  const d = distToGoal(p), kd = keeperDown(gk), S = special ? SPECIALS[special === true ? 'comet' : special] : null;
+  const c = chance(S ? S.pow + p.st.shoot * .3 : p.st.shoot, gk.st.catch + 2.5) - Math.max(0, d - 13) * (S ? S.fall : .018) - anglePen(p) * (S ? .5 : 1)
+    + (save.style === 'striker' && p === G.hero ? .05 : 0) + kd;
+  return clamp(c, .08, (S ? .9 : .8) + kd / 2);
 }
-const EN = { dribble: 14, dribble2: 22, onetwo: 6, tokai: 4, back: 0, longshot: 6, comet: 28, needle: 18, shoot: 6, curl: 6, square: 4, shortmo: 4, tackle: 12, clamp: 24, block: 7, hold: 0, dive: 0, rush: 0, slide: 10 };
+function specialOpts(me, them, add) {                           // every unlocked special shot Kai can take from here
+  const ks = unlockedSpecials(), d = distToGoal(me);
+  if (me !== G.hero || d > SPEC_RANGE || !specAngleOk(me)) return;
+  for (const k of ks) { const S = SPECIALS[k], c = shotCost(k);
+    add({ key: k, name: S.name + '!', sub: `special shot · ${c} spirit${d > 30 ? ` · from ${Math.round(d)} m` : ''}`, ch: shotChance(me, them, k), kind: 'shot', special: k, cost: c, cls: 'sp' + (ks.length > 1 ? ' sp2' : '') + (k === 'meteor' ? ' mt' : '') + (G.sp >= c ? ' pulse' : '') }); }
+}
+const EN = { header: 4, volley: 6, trap: 0, dribble: 14, dribble2: 22, onetwo: 6, tokai: 4, back: 0, longshot: 6, comet: 12, meteor: 16, needle: 18, shoot: 6, curl: 6, square: 4, shortmo: 4, tackle: 12, clamp: 24, block: 7, hold: 0, dive: 0, rush: 0, slide: 10 };
 function bonuses(o, actor) {                                 // visible boosts and penalties: ZONE, "fighting spirit" after two lost clashes in a row, TIRED
   let add = 0; const tags = [];
   const tp = actor ? tiredPen(actor) : 0; if (tp > .005) { add -= tp; tags.push(`TIRED −${Math.round(tp * 100)}`); }
   if (G.zone > 0) { add += .1; tags.push('ZONE +10'); }
   if (G.lossRun >= 2) { add += .05; tags.push('SPIRIT +5'); }
-  if (o.kind === 'shot' && actor && actor.team === 0 && keeperDown(keeperOf(1))) tags.push('KEEPER DOWN +20');
+  if (o.kind === 'shot' && actor && actor.team === 0 && keeperDown(keeperOf(1))) tags.push(`KEEPER DOWN +${Math.round(keeperDown(keeperOf(1)) * 100)}`);
   o.ch = clamp(o.ch + add, .05, o.special ? .95 : .92); o.tags = tags; return o;
 }
 const RING_BONUS = { perfect: .15, good: .07, miss: 0 };
@@ -41,11 +50,11 @@ function openScene(kind, cx) {
     } else {
       if (kind === 'squeeze') add({ key: 'dribble2', name: 'DRIBBLE BOTH', sub: 'risky · lands you in the box', ch: chance(me.st.dribble, hard + 3), kind: 'duel', big: true });
       else add({ key: 'dribble', name: 'DRIBBLE', sub: `past ${them.name} · big gain`, ch: chance(me.st.dribble, them.st.tackle), kind: 'duel', big: true });
-      if (hero && mo.stun <= 0) add({ key: 'onetwo', name: 'ONE-TWO · MO', sub: 'safer · gains less ground', ch: chance(me.st.pass + 3 + (save.style === 'playmaker' ? 1.5 : 0), them.st.tackle * .4 + them.st.speed * .4 + 2 + (kind === 'squeeze' ? 1.5 : 0)), kind: 'duel' });
-      else if (!hero) add({ key: 'tokai', name: `PASS → ${save.name}`, sub: 'find your striker', ch: chance(me.st.pass + 3, them.st.tackle * .4 + them.st.speed * .4 + 2), kind: 'duel' });
+      if (hero && mo.stun <= 0) add({ key: 'onetwo', name: 'ONE-TWO · MO', sub: 'safer · gains less ground', ch: chance(me.st.pass + 3 + (save.style === 'playmaker' ? 1.5 : 0), them.st.tackle * .4 + them.st.speed * .4 + 2 + G.L * .2 + (kind === 'squeeze' ? 1.5 : 0)), kind: 'duel' });
+      else if (!hero) add({ key: 'tokai', name: `PASS → ${save.name}`, sub: 'find your striker', ch: chance(me.st.pass + 3, them.st.tackle * .4 + them.st.speed * .4 + 2 + G.L * .2), kind: 'duel' });
       if (kind === 'squeeze') add({ key: 'back', name: 'BACK PASS', sub: 'safe · start again', noRoll: true, cls: 'safe' });
       else if (distToGoal(me) < 32 && angleOk(me)) add({ key: 'longshot', name: 'LONG SHOT', sub: `from ${Math.round(distToGoal(me))} m`, ch: shotChance(me, gk, false), kind: 'shot' });
-      if (hero && distToGoal(me) < 30 && angleOk(me)) add({ key: 'comet', name: 'COMET DRIVE!', sub: `special shot · ${cost} spirit`, ch: shotChance(me, gk, true), kind: 'shot', special: 'comet', cost, cls: 'sp' });
+      specialOpts(me, gk, add);
       if (hero && save.style === 'playmaker') add({ key: 'needle', name: 'NEEDLE PASS!', sub: `special · sends Mo 1-on-1 · ${cost} spirit`, ch: chance(me.st.pass + 10, hard), kind: 'duel', special: 'needle', cost, cls: 'sp' });
       add({ key: 'plan', name: '⏸ PLAN', sub: 'pass to anyone, one-two, steer: you decide', noRoll: true, cls: 'mini', show: 'FREE' });
       if (them.name === 'Bruno') hint = 'Bruno wins plain dribbles. Go around him: ONE-TWO, or a special.';
@@ -68,12 +77,22 @@ function openScene(kind, cx) {
         const mate = hero ? mo : G.hero;
         if (mate.stun <= 0 && dist(mate, me) < 22 && distToGoal(mate) < 24) add({ key: 'square', name: `PASS → ${mate === mo ? 'MO' : save.name}`, sub: `then you pick ${mate === mo ? 'his' : 'your'} shot`, ch: clamp(AI.passSuccess(me, mate.x, mate.y, false), .2, .92), kind: 'duel', mate });
       }
-      if (hero) add({ key: 'comet', name: 'COMET DRIVE!', sub: `special shot · ${cost} spirit`, ch: shotChance(me, them, true), kind: 'shot', special: 'comet', cost, cls: 'sp' + (sp >= cost ? ' pulse' : '') });
-      const better = kind === 'shot' && !down && steerGain(me, false);   // keep it and get closer: the clock stops again for the shot
+      if (hero) specialOpts(me, them, add);
+      const better = kind === 'shot' && !down && !cx.steered && steerGain(me, false);   // once per run: the second stop is for the shot   // keep it and get closer: the clock stops again for the shot
       if (better) add({ key: 'steer', name: 'STEER IN', sub: `keep it · run closer, then shoot ~${Math.round(better * 100)}% · a defender may come`, noRoll: true, cls: 'safe', show: `~${Math.round(better * 100)}%` });
       if (kind === 'shot') add({ key: 'plan', name: '⏸ PLAN', sub: 'pass to anyone, one-two, steer: you decide', noRoll: true, cls: 'mini', show: 'FREE' });
-      hint = down ? 'The keeper is still on the ground: +20% on a quick shot!' : them.name === 'Holt' ? 'Holt is a big keeper. Specials beat keepers.' : cx.final ? 'The last kick of the match.' : better ? 'Shoot now, or STEER IN for a better chance.' : '';
+      hint = down ? `The keeper is still getting up: +${Math.round(down * 100)}% if you shoot now!` : them.name === 'Holt' ? 'Holt is a big keeper. Specials beat keepers.' : cx.final ? 'The last kick of the match.' : better ? 'Shoot now, or STEER IN for a better chance.' : '';
     }
+  } else if (kind === 'aerial') {                              // a cross dropping onto our man in the box
+    const d = distToGoal(me), kd = keeperDown(them), marker = foes(me).filter(f => f.role !== 'GK' && f.stun <= 0 && dist(f, me) < 3.2).sort((a, c) => dist(a, me) - dist(c, me))[0];
+    const mk = marker ? clamp(.1 + ((marker.st.tackle ?? G.L) - (me.st.dribble ?? G.L)) * .012, .05, .25) : 0, mtag = o => { add(o); if (mk && o.tags) o.tags.push(`MARKED −${Math.round(mk * 100)}`); };
+    title = 'CROSS! IN THE AIR!'; sub = `${me.name} SHT ${Math.round(me.st.shoot)} vs ${them.name} CATCH ${Math.round(them.st.catch)}${marker ? ` · ${marker.name} marks him` : ''}`;
+    mtag({ key: 'header', name: 'HEADER', sub: d > 12 ? `${Math.round(d)} m · far for a header` : 'nod it down · best close in', ch: clamp(chance(me.st.shoot + 1, them.st.catch + 2.5) - Math.max(0, d - 8) * .03 - anglePen(me) * .6 + kd - mk, .05, .85), kind: 'shot' });
+    mtag({ key: 'volley', name: 'VOLLEY', sub: 'hit it first time · powerful, hard', ch: clamp(chance(me.st.shoot + 2.5, them.st.catch + 2.5) - .1 - Math.max(0, d - 12) * .015 - anglePen(me) + kd - mk * .6, .05, .85), kind: 'shot' });
+    if (marker) add({ key: 'trap', name: 'CONTROL IT', sub: `bring it down past ${marker.name}`, ch: chance(me.st.dribble, marker.st.tackle), kind: 'duel', def: undefined, marker });
+    else add({ key: 'trap', name: 'CONTROL IT', sub: 'bring it down · then decide', noRoll: true, cls: 'safe' });
+    specialOpts(me, them, add);
+    hint = mk ? `${marker.name} is on him. A volley suffers less from a marker.` : 'Nobody on him! Head it, volley it, or take it down.';
   } else if (kind === 'defend') {
     title = `STOP ${them.name.toUpperCase()}!`; sub = `${me.name} TKL ${Math.round(me.st.tackle)} vs DRI ${Math.round(them.st.dribble)}`;
     add({ key: 'tackle', name: 'TACKLE', sub: 'win the ball · big gain', ch: chance(me.st.tackle, them.st.dribble), kind: 'duel', big: true });
@@ -89,8 +108,8 @@ function openScene(kind, cx) {
     add({ key: 'dive', name: 'DIVE!', sub: `${gkp.name} goes for it`, ch: chance(gkp.st.catch, them.st.shoot) - rp, kind: 'save' });
     add({ key: 'rush', name: 'RUSH OUT', sub: 'risky · a save starts a counter', ch: chance(gkp.st.catch - 2, them.st.dribble) - rp, kind: 'save', big: true });
     if (def && dist(def, them) < 12) add({ key: 'slide', name: `${def.name.toUpperCase()} SLIDES`, sub: 'block before the shot', ch: chance(def.st.tackle, them.st.shoot + 1), kind: 'duel', def });
-    if (keeperDown(gkp)) opts.forEach(o => o.kind === 'save' && (o.tags = [...(o.tags || []), 'KEEPER DOWN −20']));
-    hint = keeperDown(gkp) ? `Rebound! ${gkp.name} is still getting up: −20% to save it.` : cx.rival ? `A rival special: −${Math.round(rp * 100)}% to save it. Nail the ring!` : 'Their shot! Your keeper needs you.';
+    if (keeperDown(gkp)) opts.forEach(o => o.kind === 'save' && (o.tags = [...(o.tags || []), `KEEPER DOWN −${Math.round(keeperDown(gkp) * 100)}`]));
+    hint = keeperDown(gkp) ? `Rebound! ${gkp.name} is still getting up: −${Math.round(keeperDown(gkp) * 100)}% to save it.` : cx.rival ? `A rival special: −${Math.round(rp * 100)}% to save it. Nail the ring!` : 'Their shot! Your keeper needs you.';
   }
   for (const o of opts) if (o.cost && sp < o.cost) o.disabled = true;
   for (const o of opts) if (o.special && !o.tut && (o.def || me).en < o.en) { o.disabled = true; o.tired = true; }   // too tired for a special: rest first
@@ -120,7 +139,8 @@ function showScene(kind, cx, title, sub, hint, opts) {
   $('pl').style.display = 'none'; document.querySelectorAll('#acts button, #bPlan').forEach(b => b.classList.remove('on'));
   G.sceneOpen = performance.now();
   if (cx.auto) { const o = opts.find(x => x.key === cx.auto && !x.disabled); if (o) { box.dataset.busy = '1'; return choose(kind, cx, o); } }   // PLAN's SPECIAL SHOT: no second pick
-  if (BOT) setTimeout(() => { const ok = opts.filter(o => !o.disabled); const o = ok.find(x => x.special && Math.random() < .7) || pick(ok); if (G && G.paused && !box.dataset.busy) { box.dataset.busy = '1'; choose(kind, cx, o); } }, 300 / FAST);
+  if (BOT) setTimeout(() => { const all = opts.filter(o => !o.disabled), free = all.filter(o => o.key === 'plan' || o.key === 'steer'), ok = all.filter(o => !free.includes(o)).length && Math.random() > .15 ? all.filter(o => !free.includes(o)) : all;   // the robot takes the free PLAN / STEER IN now and then, like a player would
+    const o = ok.find(x => x.special && Math.random() < .7) || pick(ok); if (G && G.paused && !box.dataset.busy) { box.dataset.busy = '1'; choose(kind, cx, o); } }, 300 / FAST);
 }
 
 // ---------------------------------------------------------------- choosing → clash → consequence
@@ -132,8 +152,8 @@ async function choose(kind, cx, o) {
   const actor = o.def || me; if (o.en) actor.en = Math.max(0, actor.en - o.en); if (o.key === 'hold') me.en = Math.min(100, me.en + 10);
   let win = true, q = 'miss';
   if (!o.noRoll) {
-    st.chances.push(Math.round(o.ch * 100));
-    const r = await clash(o, o.def || me, them);
+    st.chances.push(Math.round(o.ch * 100)); (st.picks = st.picks || []).push(`${o.key}${keeperDown(them) || (kind === 'save' && keeperDown(me)) ? '(kd)' : ''}:${Math.round(o.ch * 100)}`);
+    const r = await clash(o, o.def || me, o.marker || them);
     q = r.q; win = r.win;
     if (q === 'perfect') st.perfect++; else if (q === 'good') st.good++;
     if (win) { st.won++; if (o.ch < .5) st.upset++; addSp(spGain() + (q === 'perfect' ? 4 : 0)); G.streak++; G.lossRun = 0; }
@@ -153,7 +173,7 @@ async function playSpecial(o) {
   G.stat.specials++;
   const first = !save.seenCut; save.seenCut = (save.seenCut || 0) + 1; store();
   const short = !first && !BOT, dur = first ? 2.6 : 1.4;
-  if (o.special === 'comet') await techDFull('COMET DRIVE', !first && !BOT);   // long version with face shots (owner 24 Nov); shorten later
+  if (SPECIALS[o.special]) await techDFull(SPECIALS[o.special].name, !first && !BOT);   // long version with face shots (owner 24 Nov); shorten later
   else if (o.special === 'clamp') await techFX('IRON CLAMP', 'kai', ['#e8f8ff', '#5ab8ff', '#0e2c55'], first ? 1.8 : 1.2, short);
   else if (o.special === 'needle') await techFX('NEEDLE PASS', 'kai', ['#fffbd0', '#9dff7a', '#0f3d1f'], first ? 1.8 : 1.2, short);
 }
@@ -177,6 +197,11 @@ async function consequence(kind, cx, o, win) {
       break;
     }
     case 'plan': { G.afterScene = planOpen; break; }
+    case 'trap': {                                            // CONTROL IT: the ball comes down to him, or the marker takes it
+      if (win) { own(me); G.chain = true; pop(me.x, me.y - 2, 'CONTROLLED!', '#ffd23f'); }
+      else { G.fairSteal = true; own(o.marker); G.fairSteal = false; me.stun = .8; pop(o.marker.x, o.marker.y - 2, 'WON IN THE AIR', '#ff6b6b'); }
+      break;
+    }
     case 'steer': { steerIn(me); break; }
     case 'onetwo': {
       if (win) { them.stun = 1.4; G.oneTwo = { a: me, b: G.mo, tx: clamp(me.x + rnd(-4, 4), 8, W - 8), ty: Math.max(14, me.y - 13), safe: true, until: G.t + 4.5 }; pass(me, G.mo, true); pop(me.x, me.y - 2, 'ONE-TWO!', '#ffd23f');
@@ -189,8 +214,8 @@ async function consequence(kind, cx, o, win) {
       break;
     }
     case 'back': { const t = G.P.filter(q => q.team === 0 && q.role === 'DF').sort((a, c) => dist(a, me) - dist(c, me))[0]; pass(me, t, true); break; }
-    case 'longshot': case 'shoot': case 'curl': case 'comet': {
-      const out = win ? 'goal' : (o.key === 'longshot' ? (Math.random() < .5 ? 'miss' : 'catch') : (Math.random() < .55 ? 'parry' : 'catch'));
+    case 'longshot': case 'shoot': case 'curl': case 'comet': case 'meteor': case 'header': case 'volley': {
+      const out = win ? 'goal' : (o.key === 'longshot' || o.key === 'header' || o.key === 'volley' ? (Math.random() < .45 ? 'miss' : Math.random() < .5 ? 'parry' : 'catch') : (Math.random() < .55 ? 'parry' : 'catch'));
       if (o.special) await playSpecial(o);
       if (!G) return;
       if (o.tut) { G.tut = 0; }

@@ -47,6 +47,8 @@
   #acts #bTackle { position: absolute; right: 0; bottom: 0; }   /* TACKLE (defending) shares SHOOT's slot (attacking) */
   #acts #bShoot { background: #b3102b; width: 92px; height: 64px; font-size: 23px; }
   #acts #bLong { background: #2a5d7a; }
+  #acts #bSpec { background: linear-gradient(135deg, #b3102b, #ff7a00); font-size: 17px; }
+  #acts #bSpec.mt { background: linear-gradient(135deg, #3b1a8f, #00b7ff); }
   #acts #bTackle { background: #6b4a12; width: 92px; height: 64px; font-size: 22px; }
   #acts button.far { opacity: .45; }
   #acts button:active { transform: translateY(2px); box-shadow: 0 1px 0 #000; }
@@ -72,6 +74,9 @@
   #plantg button.sel { border-color: #ffd23f; background: #3a3210; }
   #plantg button i { font-style: normal; margin-left: 4px; }
   #planacts button.o2 { background: #5a3d7a; }
+  .grow { background: rgba(255,255,255,.07); border: 1px solid #ffd23f55; border-radius: 12px; padding: 8px 12px; margin: 8px auto; max-width: 380px; font-size: 13px; line-height: 1.45; text-align: left; }
+  .grow b { color: #ffd23f; } .grow > b { display: block; font-family: Bangers, sans-serif; font-size: 18px; letter-spacing: 1px; font-weight: 400; }
+  .grow span { display: block; } .grow .new { color: #8fd8ff; margin-top: 3px; }
   #planacts button:disabled { opacity: .42; filter: grayscale(.7); box-shadow: none; }
   #planbar .tac { display: flex; gap: 4px; justify-content: center; align-items: center; font-size: 12px; flex-wrap: wrap; }
   #planbar .tac button { font-size: 15px; padding: 5px 9px; background: #1b2a38; }
@@ -112,6 +117,9 @@
   #opts button .bar { position: absolute; left: 0; bottom: 0; height: 4px; background: currentColor; }
   #opts button.sp { background: linear-gradient(135deg, #b3102b, #ff7a00); grid-column: 1 / -1; }
   #opts button.sp .n { font-size: 26px; }
+  #opts button.sp.sp2 { grid-column: auto; }
+  #opts button.sp.sp2 .n { font-size: 20px; padding-right: 46px; }
+  #opts button.mt, #planacts button.mt { background: linear-gradient(135deg, #3b1a8f, #00b7ff); }
   #opts button.sp.pulse { animation: pulse .55s infinite alternate; }
   #opts button.safe { background: #1d3a33; }
   #opts button.mini { background: #1b2a38; border: 1px dashed #5a7a9a; }
@@ -212,7 +220,7 @@
 </div>
 <div id="hint"></div>
 <div id="pl"><div id="plf"></div><div id="pli"><b id="pln"></b><span id="pls"></span><div id="ple"><i></i></div><span id="plr"></span></div></div>
-<div id="acts"><button id="bLong">LONG<small></small></button><button id="bPass">PASS<small></small></button><button id="bShoot">SHOOT<small></small></button><button id="bTackle">TACKLE<small></small></button></div>
+<div id="acts"><button id="bSpec">COMET<small></small></button><button id="bLong">LONG<small></small></button><button id="bPass">PASS<small></small></button><button id="bShoot">SHOOT<small></small></button><button id="bTackle">TACKLE<small></small></button></div>
 <div id="toast"><img alt=""><div><b></b><span></span></div></div>
 <div id="scene"><div class="vs"><div class="f" id="fl"></div><h3 class="bang" id="st"></h3><div class="f them" id="fr"></div></div><p id="shint"></p><div id="opts"></div></div>
 <div id="banner"></div>
