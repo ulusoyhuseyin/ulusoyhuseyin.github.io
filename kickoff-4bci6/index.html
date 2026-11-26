@@ -66,6 +66,12 @@
   #planacts button small { display: block; font-family: system-ui; font-size: 10.5px; letter-spacing: 0; opacity: .9; }
   #planacts button.sp { background: linear-gradient(135deg, #b3102b, #ff7a00); }
   #planacts button.lg { background: #1d5a7a; }
+  #plantg { display: flex; gap: 5px; overflow-x: auto; padding: 2px 2px 6px; margin-bottom: 4px; scrollbar-width: thin; align-items: center; }
+  #plantg span { font-size: 11px; color: #9ab; white-space: nowrap; }
+  #plantg button { flex: none; font: 700 12px system-ui; border: 2px solid transparent; border-radius: 999px; padding: 4px 9px; background: #1b2a38; color: #fff; white-space: nowrap; }
+  #plantg button.sel { border-color: #ffd23f; background: #3a3210; }
+  #plantg button i { font-style: normal; margin-left: 4px; }
+  #planacts button.o2 { background: #5a3d7a; }
   #planacts button:disabled { opacity: .42; filter: grayscale(.7); box-shadow: none; }
   #planbar .tac { display: flex; gap: 4px; justify-content: center; align-items: center; font-size: 12px; flex-wrap: wrap; }
   #planbar .tac button { font-size: 15px; padding: 5px 9px; background: #1b2a38; }
@@ -108,6 +114,8 @@
   #opts button.sp .n { font-size: 26px; }
   #opts button.sp.pulse { animation: pulse .55s infinite alternate; }
   #opts button.safe { background: #1d3a33; }
+  #opts button.mini { background: #1b2a38; border: 1px dashed #5a7a9a; }
+  #opts button.mini .p { font-size: 17px; top: 8px; color: #9fe; }
   #opts button:disabled { opacity: .35; }
   #opts button:active { transform: translateY(2px); box-shadow: 0 1px 0 #0c1118; }
   .tag { display: inline-block; font-size: 10px; background: #ffd23f; color: #000; border-radius: 4px; padding: 0 4px; margin-left: 4px; font-weight: 700; vertical-align: 2px; }
@@ -209,7 +217,7 @@
 <div id="scene"><div class="vs"><div class="f" id="fl"></div><h3 class="bang" id="st"></h3><div class="f them" id="fr"></div></div><p id="shint"></p><div id="opts"></div></div>
 <div id="banner"></div>
 <button id="bPlan">⏸ PLAN<small>stop &amp; decide</small></button>
-<div id="planbar"><h4>⏸ PLAN · TIME STOPPED</h4><p id="planhint"></p><div id="planacts"></div>
+<div id="planbar"><h4>⏸ PLAN · TIME STOPPED</h4><p id="planhint"></p><div id="plantg"></div><div id="planacts"></div>
   <div class="tac">TEAM <button data-t="def">DEFEND</button><button data-t="bal">BALANCED</button><button data-t="att">ATTACK</button><button id="planGo">▶ PLAY</button></div></div>
 
 <div class="screen on" id="title">

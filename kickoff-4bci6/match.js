@@ -65,14 +65,15 @@ function newMatch() {
   if (G.tut) { const bram = P.find(p => p.name === 'Bram'); bram.x = GX + 1; bram.y = 30; G.since = 2; bram.press = true; G.nextForce = 99; }
 }
 function kickoff(team) {
-  for (const p of G.P) { p.x = p.hx; p.y = p.hy; p.vx = p.vy = 0; p.stun = 0; p.dive = 0; p.press = false; }
+  for (const p of G.P) { p.x = p.hx; p.y = p.hy; p.vx = p.vy = 0; p.stun = 0; p.dive = 0; p.press = false; p.down = 0; }
   const b = G.ball; Object.assign(b, { x: GX, y: 52.5, z: 0, vx: 0, vy: 0, vz: 0, shot: null, noPick: null, rolls: null });
   const taker = team === 0 ? G.hero : G.P.find(p => p.team === 1 && p.slot === 'FW2');
   taker.x = GX; taker.y = team === 0 ? 53.6 : 51.4; G.fairSteal = true; own(taker); G.fairSteal = false;   // kickoff (half-time may start with our ball)
-  G.oneTwo = null; G.since = Math.min(G.since, 4); b.net = null;
+  G.oneTwo = null; G.steerIn = null; G.since = Math.min(G.since, 4); b.net = null;
 }
 function own(p) { const b = G.ball;
   if (AUD && b.owner && b.owner.team === 0 && p.team === 1 && !G.fairSteal) audBad('steal_no_warning', { from: b.owner.name, by: p.name, paused: !!G.paused });   // also during fades: no magic possession
+  const o2 = G.oneTwo; if (o2 && (p !== o2.b || o2.back)) { G.oneTwo = null; if (p === o2.a) { G.chain = true; G.since = Math.max(G.since, 2.7); } }   // the runner got it back, or someone else did
   b.owner = p; b.last = p; b.shot = null; b.air = false; b.net = null; b.x = p.x; b.y = p.y + (p.team === 0 ? -.8 : .8); G.ownT = G.t; p.plan = null; b.vx = b.vy = b.vz = 0; b.z = 0; b.rolls = null; for (const q of G.P) { q.press = false; q.wind = null; } }
 const mates = p => G.P.filter(q => q.team === p.team && q !== p);
 const foes = p => G.P.filter(q => q.team !== p.team);
@@ -153,6 +154,7 @@ function shoot(p, aimX, special, out) {                      // out is decided b
   b.owner = null; b.last = p; b.vx = (aimX - b.x) / d * sp; b.vy = (gy - b.y) / d * sp; b.vz = special ? 1.6 : 3; b.z = .2;
   b.shot = { by: p, out, special, aimX, gk, gy, assist: p.team === 0 && p !== G.hero && G.assistFrom === G.hero }; b.noPick = p; b.noPickT = 99; b.rolls = null;
   if (AUD) b.shot.k = { aimX: +aimX.toFixed(1), bx: +b.x.toFixed(1), by: +b.y.toFixed(1), px: +p.x.toFixed(1), py: +p.y.toFixed(1), vx: +b.vx.toFixed(1), vy: +b.vy.toFixed(1), t: +G.t.toFixed(1) };
+  if (gk.stun > 0) gk.stun = Math.min(gk.stun, .15);   // a keeper on the ground scrambles up for the next shot (he is still not set: see keeperDown)
   gk.diveX = out === 'goal' ? aimX + (aimX > GX ? -2.2 : 2.2) : aimX;   // a beaten keeper dives the wrong way or too late
   G.flame = !!special;
   snd(special ? 'boom' : 'kick'); buzz(special ? 60 : 20);
@@ -201,6 +203,7 @@ function step(dt) {
   for (const tm of G.timers.filter(x => x.t <= G.t)) { G.timers.splice(G.timers.indexOf(tm), 1); tm.fn(); }
   if (G.t >= G.len && !b.shot && !G.goalAnim && !G.paused) return finish();
   if (!G.half && G.t >= G.len / 2 && !b.shot && !G.goalAnim && !G.paused && !G.cutting && !G.want) return halfTime();
+  if (G.oneTwo && G.t > G.oneTwo.until) G.oneTwo = null;
   if (b.owner && b.owner.team === 0) G.ctrl = b.owner;
   else if (!G.oneTwo) { const near = G.P.filter(q => q.team === 0 && q.role !== 'GK').sort((a, c) => dist(a, b) - dist(c, b))[0]; if ((dist(near, b) < dist(G.ctrl, b) - 3 && !(G.ctrlLock > G.t)) || G.ctrl.role === 'GK') G.ctrl = near; }
   AI.assignJobs();
@@ -210,7 +213,7 @@ function step(dt) {
     if (p.dash) { if (G.t < p.dash.until) { p.vx = p.dash.vx; p.vy = p.dash.vy; continue; } p.dash = null; }
     if (p.runTo && G.t < p.runTo.until && p !== G.ctrl && p.stun <= 0) { moveTo(p, p.runTo.x, p.runTo.y, 1.1); continue; }
     if (p.stun > 0) { p.stun -= dt; p.vx *= .9; p.vy *= .9; continue; }
-    if (G.oneTwo && p === G.hero && b.owner !== p) { moveTo(p, G.oneTwo.tx, G.oneTwo.ty, 1.15); continue; }
+    if (G.oneTwo && p === G.oneTwo.a && b.owner !== p) { const o = G.oneTwo; if (o.back) moveTo(p, b.x + b.vx * .25, b.y + b.vy * .25, 1.15); else moveTo(p, o.tx, o.ty, 1.15); continue; }   // run past your man, then onto the return ball
     if (p === G.ctrl) ctrlMove(p);
     else if (p.team === 1 && b.owner === p) AI.carrier(p, dt);
     else if (p.role === 'GK') keeper(p);
@@ -290,8 +293,8 @@ function ballStep(dt) {
       if (b.rolls && b.rolls.has(p) && sp > 5 && !b.rolls.get(p)) continue;          // this defender misjudged the pass
       if (b.rolls && b.rolls.has(p)) pop(p.x, p.y - 2, 'INTERCEPTED', '#ff6b6b');
       own(p); p.runTo = null;
-      if (G.oneTwo && p === G.mo) { const o = G.oneTwo; later(.2, () => { if (G.ball.owner === G.mo) { passPoint(G.mo, o.tx, o.ty); } }); }
-      if (p === G.hero && G.oneTwo) { G.oneTwo = null; G.chain = true; G.since = Math.max(G.since, 2.7); }
+      if (G.oneTwo && p === G.oneTwo.b) { const o = G.oneTwo; later(.2, () => { if (G.oneTwo === o && G.ball.owner === o.b) oneTwoBack(o); }); }
+      if (p.team === 0 && keeperOf(1).down > G.t && distToGoal(p) < 26) G.chain = true;   // a rebound: the shot decision comes at once
       if (p.team === 0 && G.lastPasser && G.lastPasser !== p) G.assistFrom = G.lastPasser;
       return;
     }
@@ -322,7 +325,7 @@ async function shotEnd(s) {
     return;
   }
   G.slow = 1; G.afterGoal = null;
-  if (s.out === 'parry') { b.vx = (b.x > GX ? 1 : -1) * rnd(5, 9); b.vy = (s.gy === 0 ? 1 : -1) * rnd(6, 10); b.vz = 2; b.noPick = s.gk; b.noPickT = .5; pop(s.gk.x, s.gk.y + (s.gy ? -2 : 2), 'PARRIED!', '#fff'); s.gk.stun = .6; burst(b.x, b.y, 16, '#fff', 6); }
+  if (s.out === 'parry') { b.vx = (b.x > GX ? 1 : -1) * rnd(5, 9); b.vy = (s.gy === 0 ? 1 : -1) * rnd(6, 10); b.vz = 2; b.noPick = s.gk; b.noPickT = .5; pop(s.gk.x, s.gk.y + (s.gy ? -2 : 2), 'PARRIED! KEEPER DOWN', '#fff'); s.gk.stun = 1; s.gk.down = G.t + KEEPER_DOWN; burst(b.x, b.y, 16, '#fff', 6); }
   else if (s.out === 'catch') { own(s.gk); pop(s.gk.x, s.gk.y + (s.gy ? -2 : 2), 'SAVED!', '#fff'); later(.9, () => { if (G.ball.owner === s.gk) distribute(s.gk); }); }
   else { pop(b.x, s.gy + (s.gy ? -2 : 2), 'WIDE!', '#ddd'); b.vx = b.vy = 0; G.goalKick = true;
     setTimeout(() => G && cut(() => { G.goalKick = false; const gk = s.gk; gk.x = GX; gk.y = s.gy === 0 ? 5 : H - 5; own(gk); later(.9, () => { if (G.ball.owner === gk) distribute(gk); }); }), 500 / FAST); }
@@ -443,11 +446,28 @@ function passSpace(p, tx, ty) {
 }
 function shootNow(p) {
   G.userShot = true;
-  const gk = keeperOf(1 - p.team), ch = clamp(shotChance(p, gk, false) - tiredPen(p), .03, .8), win = Math.random() < ch;
+  const gk = keeperOf(1 - p.team), ch = clamp(shotChance(p, gk, false) - tiredPen(p), .03, .9), win = Math.random() < ch;
   const out = win ? 'goal' : distToGoal(p) > 24 && Math.random() < .5 ? 'miss' : Math.random() < .5 ? 'parry' : 'catch';
   p.en = Math.max(0, p.en - 6); pop(p.x, p.y - 2, `SHOT ${Math.round(ch * 100)}%`, '#fff');
   shoot(p, GX + (win ? (Math.random() < .5 ? -1 : 1) * rnd(1.6, 2.9) : rnd(-1.2, 1.2)), false, out);
 }
+// ONE-TWO with any teammate (owner, 26 Nov): pass to him, run past your man, he plays it back into your run. Rolled honestly both ways.
+const oneTwoSpot = p => ({ tx: clamp(p.x + (GX - p.x) * .2, 6, W - 6), ty: clamp(p.y + (p.team === 0 ? -12 : 12), 6, H - 6) });
+function oneTwoChance(p, m) { const s = oneTwoSpot(p); return clamp(AI.passSuccess(p, m.x, m.y, false) * AI.passSuccess(m, s.tx, s.ty, false) - tiredPen(p) * .5, .03, .95); }
+function oneTwo(p, m, safe) {
+  const s = oneTwoSpot(p); G.oneTwo = { a: p, b: m, tx: s.tx, ty: s.ty, safe: !!safe, until: G.t + 4.5 };
+  pass(p, m, safe); p.en = Math.max(0, p.en - EN.onetwo); G.lastPasser = p;
+}
+function oneTwoBack(o) {
+  const b = G.ball; passPoint(o.b, o.tx, o.ty); o.back = true; G.lastPasser = o.b; if (o.a.team === 0) G.ctrl = o.a;
+  if (!o.safe) b.rolls = new Map(foes(o.b).map(q => [q, Math.random() < clamp(.2 + ((q.st.tackle || 8) - (o.b.st.pass || 9)) * .04, .05, .6)]));
+  pop(o.b.x, o.b.y - 2, 'ONE-TWO!', '#ffd23f');
+}
+// STEER IN: keep the ball and run closer; the game stops again for the shot (owner, 26 Nov: "option to steer more and shoot with better chance")
+function steerSpot(p) { const d = distToGoal(p), d2 = Math.max(9, d - 12), k = 1 - d2 / d; return { x: lerp(p.x, GX, k), y: lerp(p.y, goalY(p.team), k) }; }
+function chanceAt(p, x, y, special) { const ox = p.x, oy = p.y; p.x = x; p.y = y; const c = shotChance(p, keeperOf(1 - p.team), special); p.x = ox; p.y = oy; return bonuses({ ch: c, kind: 'shot', special }, p).ch; }   // same boosts as the shot stop
+function steerGain(p, special) { if (distToGoal(p) < 12) return null; const s = steerSpot(p), now = angleOk(p) ? chanceAt(p, p.x, p.y, special) : 0, then = chanceAt(p, s.x, s.y, special); return then - now >= .05 ? then : null; }
+function steerIn(p) { G.steerIn = { until: G.t + 4.5 }; G.chain = false; setHint('Steer in! The game stops again for your shot (or tap SHOOT).', 3500); pop(p.x, p.y - 2, 'STEER IN!', '#8fd8ff'); }
 function tackleNow(p) {
   const c = G.ball.owner; if (!c || c.team === p.team || dist(p, c) > 3.2) return;
   const ch = clamp(chance(p.st.tackle, c.st.dribble) - (dist(p, c) > 1.6 ? .1 : 0) - tiredPen(p) + tiredPen(c), .05, .9);
@@ -465,6 +485,14 @@ function director() {
     if (!ok) G.want = null; else if (dist(w.me, w.them) < 2.4) { audN('plan_duel_' + w.kind); G.want = null; return openScene(w.kind, { me: w.me, them: w.them }); }
   }
   if (!G.finalDone && G.t > G.len - 13 && gap > 1.5) return finalScene();
+  if (G.steerIn) {                                            // STEER IN (shot stop or PLAN): you run it in; the clock stops again for the shot
+    const s = G.steerIn;
+    if (b.owner !== c || c.team !== 0) G.steerIn = null;
+    else if (G.t > s.until || distToGoal(c) < 10) { G.steerIn = null;
+      if (distToGoal(c) < 28 && angleOk(c)) { audN('steer_stop'); return openScene('shot', { me: c, them: keeperOf(1) }); }
+      setHint('No angle from here. Steer back inside, or pass.', 3000); }
+    else return;
+  }
   if (gap < (G.chain ? .7 : 4)) return;
   const calm = gap >= 11;
   if (b.owner === c && c.team === 0) {
@@ -621,7 +649,7 @@ function hud() {
     const ours = free && b.owner === p && p.team === 0;
     G.tg = ours ? { s: stickyTarget('s', fwdFirst(p, AI.rankPass(p, 'pass')), now), l: stickyTarget('l', fwdLong(p, AI.rankPass(p, 'long')), now) } : null;
     const sp = G.tg && G.tg.s && (G.tgSel.sObj || {}).p;
-    setBtn('bShoot', ours && distToGoal(p) < 34 && angleOk(p), `${Math.round(clamp(shotChance(p, keeperOf(1), false) - tiredPen(p), .03, .8) * 100)}%`);
+    setBtn('bShoot', ours && distToGoal(p) < 34 && angleOk(p), `${Math.round(clamp(shotChance(p, keeperOf(1), false) - tiredPen(p), .03, .9) * 100)}%${keeperOf(1).down > G.t ? ' · KEEPER DOWN' : ''}`);
     setBtn('bPass', ours && !!G.tg.s, G.tg && G.tg.s ? `→ ${G.tg.s.name}${sp ? ` ${Math.round(sp * 100)}%` : ''}` : '');
     setBtn('bLong', ours && !!G.tg.l, G.tg && G.tg.l ? `${G.tg.l.name} ${Math.round(longChance(p) * 100)}%` : '');
     const car = b.owner, near = free && car && car.team === 1 && p.team === 0 && p.role !== 'GK' && p.stun <= 0 && dist(p, car) < 7;

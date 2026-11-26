@@ -45,7 +45,8 @@ const AI = (() => {
   function xg(q, x, y) {
     const d = Math.hypot(x - GX, atkGoalY(q.team) - y), gk = keeperOf(1 - q.team);
     const fake = { x, y, team: q.team }; if (d > 28 || !angleOk(fake)) return 0;
-    return clamp(chance(q.st.shoot || 8, (gk.st.catch || 9) + 2.5) - Math.max(0, d - 13) * .018 - anglePen(fake), .03, .8);
+    const kd = keeperDown(gk);   // a keeper on the ground after a parry: they shoot on the rebound too
+    return clamp(chance(q.st.shoot || 8, (gk.st.catch || 9) + 2.5) - Math.max(0, d - 13) * .018 - anglePen(fake) + kd, .03, .8 + kd / 2);
   }
   function holdValue(q, x, y) {                               // having the ball as q at (x, y): position, space, or the shot from there
     return Math.max(posValue(q.team, x, y) - pressure(q.team, x, y) * .18, xg(q, x, y) * 2.2);
